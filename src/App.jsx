@@ -1,12 +1,10 @@
 import React from 'react';
-import TorneosBoceto from './PantallaTorneos';
+import AppRouter from './routes/AppRouter';
+import './App.css';
 
 function App() {
   return (
-    <div>
-      <TorneosBoceto />
-      <p>Hola estoy en rama mateo!</p>
-    </div>
+    <AppRouter />
   );
 }
 
