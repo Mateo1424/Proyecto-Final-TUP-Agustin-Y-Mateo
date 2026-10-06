@@ -7,6 +7,7 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [game, setGame] = useState('Valorant');
+  const [inGameName, setInGameName] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -14,14 +15,13 @@ const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
-    // Validar si las contraseñas coinciden antes de enviar
+    
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden.');
       return;
     }
 
     try {
-      // Petición real al backend de .NET
       const response = await fetch('https://localhost:7039/api/auth/register', {
         method: 'POST',
         headers: {
@@ -31,8 +31,14 @@ const RegisterPage = () => {
           username, 
           email, 
           password,
-          ConfirmPassword: confirmPassword, 
-          game 
+          confirmPassword: confirmPassword, 
+          games: [
+            {
+              gameName: game,
+              inGameName: inGameName, 
+              rank: 'Unranked'
+            }
+          ]
         }),
       });
 
@@ -44,18 +50,15 @@ const RegisterPage = () => {
 
       const data = await response.json();
       
-      // Guardamos tanto el token como el nombre de usuario devuelto por el backend
       if (data.token) {
         localStorage.setItem('token', data.token);
       }
       if (data.user && data.user.username) {
         localStorage.setItem('username', data.user.username);
       } else {
-        // Fallback por si acaso el backend devuelve el username plano o de otra forma
         localStorage.setItem('username', username);
       }
 
-      // ¡Directo al dashboard sin pasar por el login!
       navigate('/dashboard');
       
     } catch (err) {
@@ -117,6 +120,19 @@ const RegisterPage = () => {
               <option value="League of Legends">League of Legends</option>
               <option value="FC 25">FC 25</option>
             </select>
+          </div>
+
+          {/* 🌟 Nuevo campo requerido por el backend */}
+          <div>
+            <label className="block text-xs font-medium text-gray-300 uppercase mb-1">ID / Nombre en el Juego</label>
+            <input 
+              type="text" 
+              value={inGameName}
+              onChange={(e) => setInGameName(e.target.value)}
+              placeholder="Ej: Player#1234"
+              className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
+              required
+            />
           </div>
 
           <div>
