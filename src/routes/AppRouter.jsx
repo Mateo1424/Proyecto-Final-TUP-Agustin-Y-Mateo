@@ -6,7 +6,10 @@ import MainLayout from '../components/layout/MainLayout';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import DashboardPage from '../pages/DashboardPage';
-import ProfilePage from '../pages/profile/ProfilePage'; // <--- 1. Importamos el componente de perfil
+import ProfilePage from '../pages/profile/ProfilePage';
+import TournamentsPage from '../pages/Tournaments/TournamentsPage';
+import TournamentDetailPage from '../pages/Tournaments/TournamentDetailsPage';
+import CreateTournament from '../pages/Tournaments/CreateTournament';
 
 const AppRouter = () => {
   return (
@@ -19,7 +22,13 @@ const AppRouter = () => {
         {/* Rutas Privadas / Con Layout Principal (Sidebar) */}
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/profile" element={<ProfilePage />} /> {/* <--- 2. Agregamos la ruta protegida */}
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/tournaments" element={<TournamentsPage />} /> 
+          
+          {/* 🌟 2. Coloca la ruta de creación ANTES de /:id para que no choque */}
+          <Route path="/tournaments/create" element={<CreateTournament />} /> 
+          
+          <Route path="/tournaments/:id" element={<TournamentDetailPage />} /> 
         </Route>
 
         {/* Redirección inicial: Empieza obligatoriamente en el Registro */}

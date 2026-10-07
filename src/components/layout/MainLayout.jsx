@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, Link } from 'react-router-dom'; // <--- Importamos Link
+import { Outlet, Link } from 'react-router-dom';
 
 const MainLayout = () => {
   return (
@@ -17,12 +17,19 @@ const MainLayout = () => {
             Inicio
           </Link>
           
-          {/* Nuevo enlace al Perfil */}
           <Link 
             to="/profile" 
             className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition text-purple-300 hover:text-white"
           >
             Mi Perfil
+          </Link>
+
+          {/* 🌟 Nuevo enlace agregado para Torneos */}
+          <Link 
+            to="/tournaments" 
+            className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition text-purple-300 hover:text-white"
+          >
+            Torneos
           </Link>
         </nav>
       </aside>
