@@ -29,12 +29,13 @@ const LoginPage = () => {
 
       const data = await response.json();
       
-      // Guardamos el token JWT y el nombre de usuario que devuelve tu backend
+           // Guardamos el token JWT y los datos del usuario que devuelve tu backend
       if (data.token) {
         localStorage.setItem('token', data.token);
       }
-      if (data.user && data.user.username) {
-        localStorage.setItem('username', data.user.username);
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('username', data.user.username); // se mantiene por compatibilidad con el resto de la app
       }
 
       // Si todo es correcto, redirigimos al dashboard de forma segura

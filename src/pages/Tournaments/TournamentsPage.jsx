@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config'; // 🌟 Importamos la URL centralizada
+import { API_URL } from '../../config'; 
 
 export default function TournamentsPage() {
     const [tournaments, setTournaments] = useState([]);

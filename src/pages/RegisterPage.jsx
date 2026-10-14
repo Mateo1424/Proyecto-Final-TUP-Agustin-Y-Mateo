@@ -122,7 +122,7 @@ const RegisterPage = () => {
             </select>
           </div>
 
-          {/* 🌟 Nuevo campo requerido por el backend */}
+          {/* Nuevo campo requerido por el backend */}
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">ID / Nombre en el Juego</label>
             <input 

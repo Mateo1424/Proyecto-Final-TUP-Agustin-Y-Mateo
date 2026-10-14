@@ -10,6 +10,9 @@ import ProfilePage from '../pages/profile/ProfilePage';
 import TournamentsPage from '../pages/Tournaments/TournamentsPage';
 import TournamentDetailPage from '../pages/Tournaments/TournamentDetailsPage';
 import CreateTournament from '../pages/Tournaments/CreateTournament';
+import TeamsPage from '../pages/team/TeamsPage';
+import CreateTeam from '../pages/team/CreateTeam';
+import TeamDetailPage from '../pages/team/TeamDetailpage'; 
 
 const AppRouter = () => {
   return (
@@ -23,12 +26,16 @@ const AppRouter = () => {
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          
+          {/* Rutas de Torneos */}
           <Route path="/tournaments" element={<TournamentsPage />} /> 
-          
-          {/* 🌟 2. Coloca la ruta de creación ANTES de /:id para que no choque */}
           <Route path="/tournaments/create" element={<CreateTournament />} /> 
-          
           <Route path="/tournaments/:id" element={<TournamentDetailPage />} /> 
+
+          {/* Rutas de Equipos */}
+          <Route path="/teams" element={<TeamsPage />} />
+          <Route path="/teams/create" element={<CreateTeam />} />
+          <Route path="/teams/:id" element={<TeamDetailPage />} /> {/* Ruta dinámica de detalles del equipo */}
         </Route>
 
         {/* Redirección inicial: Empieza obligatoriamente en el Registro */}

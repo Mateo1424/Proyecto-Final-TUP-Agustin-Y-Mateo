@@ -30,7 +30,7 @@ export default function CreateTournament() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
-    gameName: 'Valorant', // Valor por defecto
+    gameName: 'Valorant',
     description: '',
     startDate: '',
     endDate: '',
@@ -57,7 +57,12 @@ export default function CreateTournament() {
       return;
     }
 
-    // Si el banner se deja en blanco, asigna automáticamente la portada del juego seleccionado
+    // Validación de fechas en el cliente
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      alert('La fecha de finalización no puede ser anterior a la fecha de inicio.');
+      return;
+    }
+
     const finalBannerUrl = formData.bannerUrl.trim() !== '' 
       ? formData.bannerUrl 
       : (AVAILABLE_GAMES.find(g => g.name === formData.gameName)?.logo || "https://images.unsplash.com/photo-1616469829941-c7200edec809?q=80&w=1000&auto=format&fit=crop");
@@ -95,7 +100,6 @@ export default function CreateTournament() {
       <h2 className="text-3xl font-extrabold mb-6 tracking-wide">Crear Nuevo Torneo</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* Selección Visual de Juegos con Portadas Estables */}
         <div>
           <label className="block text-sm font-semibold mb-3">Selecciona el Juego</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -111,20 +115,17 @@ export default function CreateTournament() {
                       : 'border-gray-800 bg-[#161b22] hover:border-gray-600'
                   }`}
                 >
-                  {/* Portada del juego */}
                   <div className="h-32 w-full relative overflow-hidden bg-gray-900">
                     <img 
                       src={game.logo} 
                       alt={game.name} 
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
                     />
-                    {/* Check / Radio visual de selección */}
                     <div className="absolute top-2 right-2 w-5 h-5 rounded-full border border-white/80 flex items-center justify-center bg-black/60 shadow">
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>}
                     </div>
                   </div>
 
-                  {/* Nombre del juego */}
                   <div className="p-3 text-center bg-[#161b22]">
                     <span className={`text-xs font-bold ${isSelected ? 'text-purple-400' : 'text-gray-300'}`}>
                       {game.name}
@@ -178,7 +179,7 @@ export default function CreateTournament() {
           <input name="rankConditions" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Libre para todos los rangos / Solo Diamante+" required />
         </div>
 
-        <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40">
+        <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40 cursor-pointer">
           Guardar y Crear Torneo
         </button>
       </form>

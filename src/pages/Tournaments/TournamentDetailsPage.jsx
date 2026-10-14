@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config'; // 🌟 Importamos la URL centralizada
+import { API_URL } from '../../config';
 
 export default function TournamentDetailPage() {
     const { id } = useParams();
@@ -9,14 +9,16 @@ export default function TournamentDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [registering, setRegistering] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
-    // Simulación de usuario actual (en tu app real esto viene del contexto de autenticación o localStorage)
-    const currentUser = {
-        userId: "651234567890abcdef123456", // Reemplaza por el ID real del usuario logueado
-        username: "KaizenMX",
-        inGameName: "Kaizen#EUW",
-        rank: "Diamante II"
-    };
+    // Usuario y token reales guardados al iniciar sesión
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    const user = storedUser ? JSON.parse(storedUser) : null;
+
+    // Por ahora cualquier usuario logueado puede borrar.
+    // Cuando implementes roles, cambiá esta línea por: user?.role === 'Admin'
+    const canDelete = !!user;
 
     const fetchTournament = () => {
         fetch(`${API_URL}/tournaments/${id}`)
@@ -39,22 +41,41 @@ export default function TournamentDetailPage() {
     }, [id]);
 
     const handleRegister = async () => {
+        if (!token || !user) {
+            alert('Tenés que iniciar sesión para inscribirte.');
+            navigate('/login');
+            return;
+        }
+
         setRegistering(true);
         try {
             const response = await fetch(`${API_URL}/tournaments/${id}/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'Authorization': `Bearer ${token}` // Descomenta si usas token JWT
+                    'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(currentUser)
+                body: JSON.stringify({
+                    userId: user.id,
+                    username: user.username,
+                    inGameName: user.username,
+                    rank: 'N/A',
+                    registeredAt: new Date().toISOString()
+                })
             });
 
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Error al inscribirse');
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : null;
+
+            if (response.status === 401) {
+                throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+            }
+            if (!response.ok) {
+                throw new Error(data?.message || `Error al inscribirse (${response.status})`);
+            }
 
             alert('¡Inscripción exitosa!');
-            fetchTournament(); // Recargar datos para ver al usuario en la lista
+            fetchTournament();
         } catch (err) {
             alert(err.message);
         } finally {
@@ -62,17 +83,62 @@ export default function TournamentDetailPage() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!token || !user) {
+            alert('Tenés que iniciar sesión para eliminar torneos.');
+            navigate('/login');
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `¿Seguro que querés eliminar el torneo "${tournament.title}"? Esta acción no se puede deshacer.`
+        );
+        if (!confirmed) return;
+
+        setDeleting(true);
+        try {
+            const response = await fetch(`${API_URL}/tournaments/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : null;
+
+            if (response.status === 401) {
+                throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+            }
+            if (response.status === 403) {
+                throw new Error('No tenés permisos para eliminar este torneo.');
+            }
+            if (!response.ok) {
+                throw new Error(data?.message || `Error al eliminar (${response.status})`);
+            }
+
+            alert('Torneo eliminado con éxito.');
+            navigate('/tournaments');
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     if (loading) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
     if (error) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-red-400">Error: {error}</div>;
     if (!tournament) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Torneo no encontrado.</div>;
 
-    const isAlreadyRegistered = tournament.participants.some(p => p.UserId === currentUser.userId);
+    const isAlreadyRegistered = user
+        ? tournament.participants.some(p => p.userId === user.id)
+        : false;
 
     return (
         <div className="p-6 bg-[#0d1117] min-h-screen text-white">
             <div className="max-w-7xl mx-auto">
-                <button 
-                    onClick={() => navigate(-1)} 
+                <button
+                    onClick={() => navigate(-1)}
                     className="text-sm text-purple-400 hover:underline mb-6 flex items-center gap-1"
                 >
                     ← Volver a torneos
@@ -93,23 +159,35 @@ export default function TournamentDetailPage() {
                             <span className="text-xs text-gray-400 block">Pozo de Premios</span>
                             <span className="text-3xl font-extrabold text-emerald-400">€{tournament.prizePool}</span>
                         </div>
-                        <button
-                            onClick={handleRegister}
-                            disabled={isAlreadyRegistered || registering}
-                            className={`w-full md:w-auto px-6 py-3 rounded-lg font-bold transition shadow-lg ${
-                                isAlreadyRegistered 
-                                    ? 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700' 
-                                    : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/40'
-                            }`}
-                        >
-                            {isAlreadyRegistered ? 'Inscrito ✓' : registering ? 'Inscribiendo...' : 'Inscribirse al Torneo'}
-                        </button>
+
+                        <div className="flex flex-col gap-2 w-full md:w-auto">
+                            <button
+                                onClick={handleRegister}
+                                disabled={isAlreadyRegistered || registering}
+                                className={`w-full md:w-auto px-6 py-3 rounded-lg font-bold transition shadow-lg ${
+                                    isAlreadyRegistered
+                                        ? 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700'
+                                        : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/40'
+                                }`}
+                            >
+                                {isAlreadyRegistered ? 'Inscrito ✓' : registering ? 'Inscribiendo...' : 'Inscribirse al Torneo'}
+                            </button>
+
+                            {canDelete && (
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={deleting}
+                                    className="w-full md:w-auto px-6 py-3 rounded-lg font-bold transition border border-red-800 text-red-400 hover:bg-red-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {deleting ? 'Eliminando...' : 'Eliminar Torneo'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Grid de Secciones (Detalles, Reglas, Participantes) */}
+                {/* Grid de Secciones (Reglas y Participantes) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Columna Izquierda / Centro: Información y Reglas */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
                             <h3 className="text-xl font-bold mb-4 text-white">Reglas Clave</h3>
