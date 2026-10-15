@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../config';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -12,8 +13,7 @@ const LoginPage = () => {
     setError('');
 
     try {
-      // Petición real al backend de .NET
-      const response = await fetch('https://localhost:7039/api/auth/login', {
+      const response = await apiFetch('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -22,23 +22,19 @@ const LoginPage = () => {
       });
 
       if (!response.ok) {
-        // Si el backend rechaza la contraseña o el usuario no existe (ej. 400 o 401)
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Credenciales inválidas.');
       }
 
       const data = await response.json();
-      
-           // Guardamos el token JWT y los datos del usuario que devuelve tu backend
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
+
+      // El token viaja en una cookie HttpOnly; acá solo guardamos los datos del usuario
       if (data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('username', data.user.username); // se mantiene por compatibilidad con el resto de la app
+        localStorage.setItem('username', data.user.username);
       }
+      localStorage.removeItem('token'); // limpieza del esquema anterior
 
-      // Si todo es correcto, redirigimos al dashboard de forma segura
       navigate('/dashboard');
 
     } catch (err) {

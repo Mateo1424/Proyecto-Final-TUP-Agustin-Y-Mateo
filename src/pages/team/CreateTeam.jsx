@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { apiFetch } from '../../config';
 
 export default function CreateTeam() {
   const navigate = useNavigate();
@@ -16,19 +16,18 @@ export default function CreateTeam() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
 
-    if (!token) {
+    if (!localStorage.getItem('user')) {
       alert('Debes iniciar sesión para crear un equipo.');
+      navigate('/login');
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/teams`, {
+      const response = await apiFetch('/teams', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(formData)
       });
@@ -36,8 +35,12 @@ export default function CreateTeam() {
       if (response.ok) {
         alert('¡Equipo creado con éxito!');
         navigate('/teams');
+      } else if (response.status === 401) {
+        alert('Tu sesión expiró. Volvé a iniciar sesión.');
+        localStorage.removeItem('user');
+        navigate('/login');
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         alert(`Error al crear el equipo: ${errorData.message || 'Verifica los datos'}`);
       }
     } catch (error) {

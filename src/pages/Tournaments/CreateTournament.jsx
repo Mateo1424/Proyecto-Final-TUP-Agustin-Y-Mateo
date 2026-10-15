@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { apiFetch } from '../../config';
 
 // Portadas oficiales garantizadas con enlaces estables
 const AVAILABLE_GAMES = [
@@ -50,10 +50,10 @@ export default function CreateTournament() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
 
-    if (!token) {
+    if (!localStorage.getItem('user')) {
       alert('Debes iniciar sesión para crear un torneo.');
+      navigate('/login');
       return;
     }
 
@@ -73,11 +73,10 @@ export default function CreateTournament() {
     };
 
     try {
-      const response = await fetch(`${API_URL}/tournaments`, {
+      const response = await apiFetch('/tournaments', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -85,8 +84,12 @@ export default function CreateTournament() {
       if (response.ok) {
         alert('¡Torneo creado con éxito!');
         navigate('/tournaments');
+      } else if (response.status === 401) {
+        alert('Tu sesión expiró. Volvé a iniciar sesión.');
+        localStorage.removeItem('user');
+        navigate('/login');
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         alert(`Error al crear el torneo: ${errorData.message || 'Verifica los datos'}`);
       }
     } catch (error) {

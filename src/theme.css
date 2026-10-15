@@ -1,0 +1,189 @@
+/* ===== Tema LED rojo (estilo teclado mecánico) ===== */
+
+/* Paleta: "purple" pasa a ser rojo (Tailwind v4).
+   Si usás Tailwind v3, hacelo en tailwind.config.js (ver más abajo). */
+:root {
+  --color-purple-50: #fff1f1;
+  --color-purple-100: #ffdede;
+  --color-purple-200: #ffc2c2;
+  --color-purple-300: #ff9a9a;
+  --color-purple-400: #ff6b6b;
+  --color-purple-500: #ff3b3b;
+  --color-purple-600: #e5202a;
+  --color-purple-700: #c0141f;
+  --color-purple-800: #8f101a;
+  --color-purple-900: #5e0c12;
+  --color-purple-950: #2e0509;
+}
+
+html,
+body {
+  background-color: #000;
+  color: #fff;
+}
+
+::selection {
+  background: rgba(255, 32, 42, 0.5);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #7a1018 transparent;
+}
+
+/* ----- Superficies: negro con tinte rojo ----- */
+
+/* Cajas internas (inputs, ítems dentro de tarjetas) */
+.bg-\[\#0d1117\] {
+  background-color: rgba(8, 2, 2, 0.9) !important;
+}
+
+/* Contenedores de pantalla completa: transparentes para ver el fondo animado */
+.min-h-screen.bg-\[\#0d1117\],
+.h-screen.bg-\[\#0d1117\],
+main.bg-\[\#0d1117\] {
+  background-color: transparent !important;
+}
+
+/* Tarjetas y menú lateral: cristal oscuro */
+.bg-\[\#161b22\] {
+  background-color: rgba(18, 6, 6, 0.82) !important;
+  backdrop-filter: blur(6px);
+}
+
+.bg-\[\#1f242d\] {
+  background-color: rgba(40, 10, 10, 0.9) !important;
+}
+
+.bg-\[\#21262d\]:hover,
+.hover\:bg-\[\#21262d\]:hover {
+  background-color: rgba(255, 32, 42, 0.12) !important;
+}
+
+.bg-gray-900,
+.bg-gray-900\/60 {
+  background-color: rgba(26, 8, 8, 0.7) !important;
+}
+
+.bg-gray-800 {
+  background-color: rgba(48, 14, 14, 0.9) !important;
+}
+
+/* Bordes en rojo tenue */
+.border-gray-800,
+.border-gray-800\/80,
+.border-gray-800\/60 {
+  border-color: rgba(255, 40, 50, 0.22) !important;
+}
+
+.border-gray-700 {
+  border-color: rgba(255, 60, 70, 0.32) !important;
+}
+
+/* ----- Fondo LED animado ----- */
+
+.led-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000;
+}
+
+/* Resplandor que "respira" */
+.led-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 110%, rgba(255, 0, 20, 0.38), transparent 55%),
+    radial-gradient(circle at 50% -10%, rgba(255, 0, 20, 0.14), transparent 50%);
+  animation: led-breathe 6s ease-in-out infinite;
+}
+
+.led-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+/* Cada tecla se prende y se apaga de a poco */
+.led-key {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 40, 50, 0.55);
+  background: rgba(255, 20, 30, 0.1);
+  box-shadow:
+    0 0 18px rgba(255, 20, 30, 0.55),
+    inset 0 0 12px rgba(255, 20, 30, 0.25);
+  opacity: 0.03;
+  will-change: opacity;
+  animation: led-key 5s ease-in-out infinite;
+}
+
+/* Oscurece los bordes para que el contenido se lea bien */
+.led-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 25%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+@keyframes led-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@keyframes led-key {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.3; }
+}
+
+/* ----- Loader y barra de progreso ----- */
+
+.led-loader-key {
+  width: 18px;
+  height: 28px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 60, 70, 0.55);
+  background: rgba(255, 30, 40, 0.1);
+  animation: led-loader 1.1s ease-in-out infinite;
+}
+
+@keyframes led-loader {
+  0%, 100% { background: rgba(255, 30, 40, 0.1); box-shadow: none; }
+  50% { background: #ff2020; box-shadow: 0 0 18px #ff2020; }
+}
+
+.led-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 100;
+  transform-origin: left;
+  background: linear-gradient(90deg, transparent, #ff2020 50%, transparent);
+  box-shadow: 0 0 12px #ff2020;
+  animation: led-progress 0.5s ease-out forwards;
+}
+
+@keyframes led-progress {
+  from { transform: scaleX(0); opacity: 1; }
+  to { transform: scaleX(1); opacity: 0.2; }
+}
+
+/* Accesibilidad: sin animaciones si el usuario lo pidió */
+@media (prefers-reduced-motion: reduce) {
+  .led-glow,
+  .led-key,
+  .led-loader-key,
+  .led-progress {
+    animation: none;
+  }
+  .led-key {
+    opacity: 0.08;
+  }
+}

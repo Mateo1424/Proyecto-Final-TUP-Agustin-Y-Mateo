@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiFetch } from '../../config';
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [userTeam, setUserTeam] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,16 +17,14 @@ const ProfilePage = () => {
 
   const fetchProfileAndTeam = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      // 1. Cargar Perfil
-      const profileResponse = await fetch('https://localhost:7039/api/profile/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // 1. Cargar Perfil (la sesión viaja en la cookie)
+      const profileResponse = await apiFetch('/profile/me');
+
+      if (profileResponse.status === 401) {
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
 
       if (!profileResponse.ok) {
         throw new Error('No se pudo cargar la información del perfil.');
@@ -42,13 +41,7 @@ const ProfilePage = () => {
       setAvatarUrlInput(profileData.avatarUrl || '');
 
       // 2. Cargar Equipos para verificar si el usuario pertenece a uno
-      const teamsResponse = await fetch(`${API_URL}/teams`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const teamsResponse = await apiFetch('/teams');
 
       if (teamsResponse.ok) {
         const teamsData = await teamsResponse.json();
@@ -75,11 +68,9 @@ const ProfilePage = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
-     
-      const statsResponse = await fetch('https://localhost:7039/api/profile/stats', {
+      const statsResponse = await apiFetch('/profile/stats', {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wins: Number(statsForm.wins),
           losses: Number(statsForm.losses),
@@ -90,9 +81,9 @@ const ProfilePage = () => {
       if (!statsResponse.ok) throw new Error('Error al actualizar las estadísticas.');
       const statsData = await statsResponse.json();
 
-      const avatarResponse = await fetch('https://localhost:7039/api/profile/avatar', {
+      const avatarResponse = await apiFetch('/profile/avatar', {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ AvatarUrl: avatarUrlInput })
       });
 
@@ -131,7 +122,6 @@ const ProfilePage = () => {
           PERFIL
         </div>
 
-        
         <div className="w-24 h-24 rounded-full bg-purple-600 flex items-center justify-center font-black text-4xl text-white shadow-lg shadow-purple-900/40 uppercase border-2 border-purple-400 overflow-hidden flex-shrink-0">
           {profile?.avatarUrl && profile.avatarUrl.trim() !== '' ? (
             <img src={profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -249,7 +239,7 @@ const ProfilePage = () => {
           </div>
         </section>
 
-        {/* 🌟 Sección: Mi Equipo (Optimizada y sin listas masivas) */}
+        {/* Sección: Mi Equipo */}
         <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800 space-y-4 flex flex-col justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Mi Equipo</h3>

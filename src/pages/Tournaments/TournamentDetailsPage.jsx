@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { apiFetch } from '../../config';
 
 export default function TournamentDetailPage() {
     const { id } = useParams();
@@ -11,8 +11,7 @@ export default function TournamentDetailPage() {
     const [registering, setRegistering] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    // Usuario y token reales guardados al iniciar sesión
-    const token = localStorage.getItem('token');
+    // Datos del usuario guardados al iniciar sesión (el token va en la cookie)
     const storedUser = localStorage.getItem('user');
     const user = storedUser ? JSON.parse(storedUser) : null;
 
@@ -21,7 +20,7 @@ export default function TournamentDetailPage() {
     const canDelete = !!user;
 
     const fetchTournament = () => {
-        fetch(`${API_URL}/tournaments/${id}`)
+        apiFetch(`/tournaments/${id}`)
             .then(res => {
                 if (!res.ok) throw new Error('No se pudo cargar el detalle del torneo.');
                 return res.json();
@@ -40,8 +39,14 @@ export default function TournamentDetailPage() {
         fetchTournament();
     }, [id]);
 
+    const handleSessionExpired = () => {
+        localStorage.removeItem('user');
+        alert('Tu sesión expiró. Volvé a iniciar sesión.');
+        navigate('/login');
+    };
+
     const handleRegister = async () => {
-        if (!token || !user) {
+        if (!user) {
             alert('Tenés que iniciar sesión para inscribirte.');
             navigate('/login');
             return;
@@ -49,11 +54,10 @@ export default function TournamentDetailPage() {
 
         setRegistering(true);
         try {
-            const response = await fetch(`${API_URL}/tournaments/${id}/register`, {
+            const response = await apiFetch(`/tournaments/${id}/register`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     userId: user.id,
@@ -64,12 +68,14 @@ export default function TournamentDetailPage() {
                 })
             });
 
+            if (response.status === 401) {
+                handleSessionExpired();
+                return;
+            }
+
             const text = await response.text();
             const data = text ? JSON.parse(text) : null;
 
-            if (response.status === 401) {
-                throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
-            }
             if (!response.ok) {
                 throw new Error(data?.message || `Error al inscribirse (${response.status})`);
             }
@@ -84,7 +90,7 @@ export default function TournamentDetailPage() {
     };
 
     const handleDelete = async () => {
-        if (!token || !user) {
+        if (!user) {
             alert('Tenés que iniciar sesión para eliminar torneos.');
             navigate('/login');
             return;
@@ -97,22 +103,21 @@ export default function TournamentDetailPage() {
 
         setDeleting(true);
         try {
-            const response = await fetch(`${API_URL}/tournaments/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+            const response = await apiFetch(`/tournaments/${id}`, {
+                method: 'DELETE'
             });
 
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
-
             if (response.status === 401) {
-                throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+                handleSessionExpired();
+                return;
             }
             if (response.status === 403) {
                 throw new Error('No tenés permisos para eliminar este torneo.');
             }
+
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : null;
+
             if (!response.ok) {
                 throw new Error(data?.message || `Error al eliminar (${response.status})`);
             }
@@ -217,17 +222,39 @@ export default function TournamentDetailPage() {
                             {tournament.participants.length === 0 ? (
                                 <p className="text-gray-500 text-sm text-center py-10">Aún no hay participantes inscritos.</p>
                             ) : (
-                                tournament.participants.map((p, index) => (
-                                    <div key={index} className="bg-gray-900/60 border border-gray-800/80 p-3 rounded-lg flex items-center justify-between text-sm">
-                                        <div>
-                                            <p className="font-semibold text-white">{p.username}</p>
-                                            <p className="text-xs text-gray-400">{p.inGameName}</p>
+                                tournament.participants.map((p, index) => {
+                                    const isMe = user && p.userId === user.id;
+                                    const canOpenProfile = !!p.userId;
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => {
+                                                if (canOpenProfile) navigate(isMe ? '/profile' : `/users/${p.userId}`);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && canOpenProfile) navigate(isMe ? '/profile' : `/users/${p.userId}`);
+                                            }}
+                                            title={`Ver perfil de ${p.username}`}
+                                            className={`bg-gray-900/60 border border-gray-800/80 p-3 rounded-lg flex items-center justify-between text-sm transition ${
+                                                canOpenProfile ? 'cursor-pointer hover:border-purple-600/60 hover:bg-gray-900' : ''
+                                            }`}
+                                        >
+                                            <div>
+                                                <p className="font-semibold text-white flex items-center gap-2">
+                                                    {p.username}
+                                                    {isMe && <span className="text-[10px] bg-purple-900 text-purple-200 px-1.5 py-0.5 rounded">Tú</span>}
+                                                </p>
+                                                <p className="text-xs text-gray-400">{p.inGameName}</p>
+                                            </div>
+                                            <span className="text-xs font-medium text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/30">
+                                                {p.rank || "N/A"}
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-medium text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/30">
-                                            {p.rank || "N/A"}
-                                        </span>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../config';
 
 const RegisterPage = () => {
   const [username, setUsername] = useState('');
@@ -15,14 +16,13 @@ const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
-    
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden.');
       return;
     }
 
     try {
-      const response = await fetch('https://localhost:7039/api/auth/register', {
+      const response = await apiFetch('/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,21 +43,21 @@ const RegisterPage = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.message || (errorData.errors ? Object.values(errorData.errors)[0][0] : 'Error al registrarse en el servidor.');
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-      if (data.user && data.user.username) {
+
+      // El token viaja en una cookie HttpOnly; acá solo guardamos los datos del usuario
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('username', data.user.username);
       } else {
         localStorage.setItem('username', username);
       }
+      localStorage.removeItem('token'); // limpieza del esquema anterior
 
       navigate('/dashboard');
       
@@ -122,7 +122,6 @@ const RegisterPage = () => {
             </select>
           </div>
 
-          {/* Nuevo campo requerido por el backend */}
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">ID / Nombre en el Juego</label>
             <input 
