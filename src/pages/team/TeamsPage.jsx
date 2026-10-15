@@ -1,34 +1,64 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { apiFetch } from '../../config';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadTeams = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiFetch('/teams');
+      if (!res.ok) {
+        throw new Error(`No se pudieron cargar los equipos (error ${res.status}).`);
+      }
+      const data = await res.json();
+      setTeams(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error al cargar equipos:', err);
+      setError(
+        err instanceof TypeError
+          ? 'No se pudo conectar con el servidor. ¿Está corriendo el backend?'
+          : err.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch(`${API_URL}/teams`)
-      .then((res) => res.json())
-      .then((data) => {
-        setTeams(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error al cargar equipos:', err);
-        setLoading(false);
-      });
+    loadTeams();
   }, []);
 
   if (loading) {
     return <div className="p-6 text-white text-center">Cargando equipos...</div>;
   }
 
+  if (error) {
+    return (
+      <div className="p-6 text-white max-w-xl mx-auto text-center space-y-4">
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-400 text-sm rounded-lg">
+          {error}
+        </div>
+        <button
+          onClick={loadTeams}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition cursor-pointer"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 text-white max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-extrabold tracking-wide">Equipos Registrados</h2>
-        <Link 
-          to="/teams/create" 
+        <Link
+          to="/teams/create"
           className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40"
         >
           + Crear Equipo
@@ -48,10 +78,10 @@ export default function TeamsPage() {
             <Link to={`/teams/${team.id}`} key={team.id} className="block group">
               <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between p-5 shadow-md group-hover:border-purple-500 transition">
                 <div className="flex items-center space-x-4 mb-4">
-                  <img 
-                    src={team.logoUrl} 
-                    alt={team.name} 
-                    className="w-14 h-14 object-cover rounded-full border border-purple-500/50 bg-gray-900" 
+                  <img
+                    src={team.logoUrl}
+                    alt={team.name}
+                    className="w-14 h-14 object-cover rounded-full border border-purple-500/50 bg-gray-900"
                   />
                   <div>
                     <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition">{team.name}</h3>
@@ -60,7 +90,7 @@ export default function TeamsPage() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="border-t border-gray-800 pt-3 flex justify-between items-center text-xs text-gray-400">
                   <span>Miembros: <strong className="text-white">{team.members?.length || 0}</strong></span>
                   <span className="text-purple-400 font-medium group-hover:underline">Ver detalles →</span>

@@ -26,6 +26,24 @@ const AVAILABLE_GAMES = [
   }
 ];
 
+// Convierte una fecha al formato que entiende <input type="datetime-local"> (hora local)
+const toLocalInputValue = (date) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+// Abre el calendario al hacer clic en cualquier parte del campo (no solo en el ícono)
+const openPicker = (e) => {
+  try {
+    e.target.showPicker?.();
+  } catch {
+    // Algunos navegadores no lo permiten: queda el ícono nativo
+  }
+};
+
+const dateInputClass =
+  'w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none cursor-pointer';
+
 export default function CreateTournament() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -48,6 +66,17 @@ export default function CreateTournament() {
     setFormData({ ...formData, gameName });
   };
 
+  // Atajo para pruebas: inicio dentro de N minutos y fin una hora después
+  const setQuickStart = (minutes) => {
+    const start = new Date(Date.now() + minutes * 60 * 1000);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    setFormData({
+      ...formData,
+      startDate: toLocalInputValue(start),
+      endDate: toLocalInputValue(end)
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -63,13 +92,23 @@ export default function CreateTournament() {
       return;
     }
 
+    const maxParticipants = Number(formData.maxParticipants);
+    if (!Number.isInteger(maxParticipants) || maxParticipants < 2) {
+      alert('El torneo necesita al menos 2 participantes.');
+      return;
+    }
+
     const finalBannerUrl = formData.bannerUrl.trim() !== '' 
       ? formData.bannerUrl 
       : (AVAILABLE_GAMES.find(g => g.name === formData.gameName)?.logo || "https://images.unsplash.com/photo-1616469829941-c7200edec809?q=80&w=1000&auto=format&fit=crop");
 
+    // Las fechas se envían en UTC para que no dependan de la zona horaria del servidor
     const payload = {
       ...formData,
-      bannerUrl: finalBannerUrl
+      maxParticipants,
+      bannerUrl: finalBannerUrl,
+      startDate: new Date(formData.startDate).toISOString(),
+      endDate: new Date(formData.endDate).toISOString()
     };
 
     try {
@@ -150,21 +189,63 @@ export default function CreateTournament() {
           <textarea name="description" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Breve descripción del evento..." />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Fecha de Inicio</label>
-            <input type="datetime-local" name="startDate" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" required />
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-1">Fecha y Hora de Inicio</label>
+              <input
+                type="datetime-local"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleChange}
+                onClick={openPicker}
+                style={{ colorScheme: 'dark' }}
+                className={dateInputClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">Fecha y Hora de Fin</label>
+              <input
+                type="datetime-local"
+                name="endDate"
+                value={formData.endDate}
+                min={formData.startDate || undefined}
+                onChange={handleChange}
+                onClick={openPicker}
+                style={{ colorScheme: 'dark' }}
+                className={dateInputClass}
+                required
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Fecha de Fin</label>
-            <input type="datetime-local" name="endDate" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" required />
+
+          {/* Atajos para probar rápido las llaves automáticas */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setQuickStart(2)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-500/50 text-purple-300 hover:bg-purple-950/40 transition cursor-pointer"
+            >
+              Empezar en 2 minutos
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickStart(5)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-500/50 text-purple-300 hover:bg-purple-950/40 transition cursor-pointer"
+            >
+              Empezar en 5 minutos
+            </button>
+            <span className="text-xs text-gray-500">
+              Atajo para pruebas: completa el inicio y pone el fin una hora después.
+            </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-semibold mb-1">Máx. Participantes</label>
-            <input type="number" name="maxParticipants" value={formData.maxParticipants} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" />
+            <input type="number" name="maxParticipants" min={2} value={formData.maxParticipants} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-semibold mb-1">URL del Banner <span className="text-gray-500 font-normal">(Opcional)</span></label>

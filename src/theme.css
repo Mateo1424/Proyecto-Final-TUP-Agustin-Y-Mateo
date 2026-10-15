@@ -1,7 +1,7 @@
 /* ===== Tema LED rojo (estilo teclado mecánico) ===== */
 
 /* Paleta: "purple" pasa a ser rojo (Tailwind v4).
-   Si usás Tailwind v3, hacelo en tailwind.config.js (ver más abajo). */
+   Si usás Tailwind v3, hacelo en tailwind.config.js. */
 :root {
   --color-purple-50: #fff1f1;
   --color-purple-100: #ffdede;
@@ -14,6 +14,10 @@
   --color-purple-800: #8f101a;
   --color-purple-900: #5e0c12;
   --color-purple-950: #2e0509;
+
+  /* Brillo actual del LED (0.15 a 1). Lo actualiza LedBackground.jsx en cada
+     cuadro; este valor es solo el de respaldo hasta que arranca la animación. */
+  --led-glow: 0.6;
 }
 
 html,
@@ -45,10 +49,13 @@ main.bg-\[\#0d1117\] {
   background-color: transparent !important;
 }
 
-/* Tarjetas y menú lateral: cristal oscuro */
+/* Tarjetas y menú lateral: cristal oscuro con un halo rojo que respira */
 .bg-\[\#161b22\] {
   background-color: rgba(18, 6, 6, 0.82) !important;
   backdrop-filter: blur(6px);
+  box-shadow:
+    0 0 24px rgba(255, 20, 30, calc(var(--led-glow) * 0.10)),
+    inset 0 0 18px rgba(255, 20, 30, calc(var(--led-glow) * 0.04));
 }
 
 .bg-\[\#1f242d\] {
@@ -69,76 +76,31 @@ main.bg-\[\#0d1117\] {
   background-color: rgba(48, 14, 14, 0.9) !important;
 }
 
-/* Bordes en rojo tenue */
+/* Bordes rojos que se prenden y apagan junto con el fondo */
 .border-gray-800,
 .border-gray-800\/80,
 .border-gray-800\/60 {
-  border-color: rgba(255, 40, 50, 0.22) !important;
+  border-color: rgba(255, 40, 50, calc(0.14 + var(--led-glow) * 0.18)) !important;
 }
 
 .border-gray-700 {
-  border-color: rgba(255, 60, 70, 0.32) !important;
+  border-color: rgba(255, 60, 70, calc(0.22 + var(--led-glow) * 0.2)) !important;
 }
 
-/* ----- Fondo LED animado ----- */
+/* ----- Detalles LED ----- */
 
-.led-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  background: #000;
+/* Texto con brillo que respira (logo) */
+.led-text {
+  text-shadow: 0 0 calc(6px + var(--led-glow) * 10px)
+    rgba(255, 32, 42, calc(0.35 + var(--led-glow) * 0.5));
 }
 
-/* Resplandor que "respira" */
-.led-glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 50% 110%, rgba(255, 0, 20, 0.38), transparent 55%),
-    radial-gradient(circle at 50% -10%, rgba(255, 0, 20, 0.14), transparent 50%);
-  animation: led-breathe 6s ease-in-out infinite;
-}
-
-.led-grid {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
-  grid-template-rows: repeat(var(--rows), 1fr);
-  gap: 14px;
-  padding: 14px;
-}
-
-/* Cada tecla se prende y se apaga de a poco */
-.led-key {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 40, 50, 0.55);
-  background: rgba(255, 20, 30, 0.1);
+/* Link activo del menú lateral */
+.led-nav-active {
+  background-color: rgba(255, 32, 42, 0.12);
   box-shadow:
-    0 0 18px rgba(255, 20, 30, 0.55),
-    inset 0 0 12px rgba(255, 20, 30, 0.25);
-  opacity: 0.03;
-  will-change: opacity;
-  animation: led-key 5s ease-in-out infinite;
-}
-
-/* Oscurece los bordes para que el contenido se lea bien */
-.led-vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at center, transparent 25%, rgba(0, 0, 0, 0.7) 100%);
-}
-
-@keyframes led-breathe {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
-}
-
-@keyframes led-key {
-  0%, 100% { opacity: 0.03; }
-  50% { opacity: 0.3; }
+    inset 3px 0 0 #ff2020,
+    0 0 14px rgba(255, 32, 42, calc(var(--led-glow) * 0.25));
 }
 
 /* ----- Loader y barra de progreso ----- */
@@ -177,13 +139,8 @@ main.bg-\[\#0d1117\] {
 
 /* Accesibilidad: sin animaciones si el usuario lo pidió */
 @media (prefers-reduced-motion: reduce) {
-  .led-glow,
-  .led-key,
   .led-loader-key,
   .led-progress {
     animation: none;
-  }
-  .led-key {
-    opacity: 0.08;
   }
 }

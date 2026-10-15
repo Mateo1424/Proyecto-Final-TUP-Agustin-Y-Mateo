@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../../config'; 
+import { getStoredUser, isModerator } from '../../utils/Roles';
 
 export default function TournamentsPage() {
     const [tournaments, setTournaments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+
+    // Solo los moderadores pueden crear torneos (el backend también lo valida)
+    const canCreate = isModerator(getStoredUser());
 
     useEffect(() => {
         // Petición al backend usando la URL centralizada
@@ -49,13 +53,15 @@ export default function TournamentsPage() {
                         <h1 className="text-3xl font-bold tracking-wide">Torneos Activos</h1>
                         <p className="text-gray-400 text-sm mt-1">Compite, escala en las tablas y gana grandes premios.</p>
                     </div>
-                    {/* Botón para ir al formulario de creación de torneos */}
-                    <button
-                        onClick={() => navigate('/tournaments/create')}
-                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2.5 rounded-lg transition shadow-lg shadow-purple-900/30 flex items-center gap-2 text-sm"
-                    >
-                        <span>+ Crear Torneo</span>
-                    </button>
+                    {/* Botón para ir al formulario de creación de torneos (solo moderadores) */}
+                    {canCreate && (
+                        <button
+                            onClick={() => navigate('/tournaments/create')}
+                            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2.5 rounded-lg transition shadow-lg shadow-purple-900/30 flex items-center gap-2 text-sm"
+                        >
+                            <span>+ Crear Torneo</span>
+                        </button>
+                    )}
                 </div>
 
                 {tournaments.length === 0 ? (

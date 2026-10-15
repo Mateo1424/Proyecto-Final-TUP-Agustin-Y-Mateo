@@ -1,7 +1,13 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import LoadingScreen from './LoadingScreen';
+
+const linkBase = 'block px-3 py-2 rounded-lg hover:bg-[#21262d] transition';
+
+// Link resaltado con LED cuando la ruta está activa (/teams también marca /teams/123)
+const navClass = ({ isActive }) =>
+  `${linkBase} ${isActive ? 'led-nav-active text-white font-semibold' : 'text-purple-300 hover:text-white'}`;
 
 const MainLayout = () => {
   const navigate = useNavigate();
@@ -30,43 +36,28 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0d1117] text-white overflow-hidden">
+    <div className="flex h-screen text-white overflow-hidden">
       {navigating && <div key={location.pathname} className="led-progress" />}
 
       {/* Sidebar / Barra lateral */}
       <aside className="w-64 bg-[#161b22] border-r border-gray-800 flex flex-col justify-between">
         <div>
-          <div className="p-5 font-bold text-xl tracking-wider text-purple-400">
+          <div className="p-5 font-bold text-xl tracking-wider text-purple-400 led-text">
             NEXUS ARENA
           </div>
-          <nav className="flex-1 px-4 space-y-2 text-gray-300">
-            <Link
-              to="/dashboard"
-              className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition"
-            >
+          <nav className="flex-1 px-4 space-y-2">
+            <NavLink to="/dashboard" className={navClass}>
               Inicio
-            </Link>
-
-            <Link
-              to="/profile"
-              className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition text-purple-300 hover:text-white"
-            >
+            </NavLink>
+            <NavLink to="/profile" className={navClass}>
               Mi Perfil
-            </Link>
-
-            <Link
-              to="/teams"
-              className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition text-purple-300 hover:text-white font-semibold"
-            >
+            </NavLink>
+            <NavLink to="/teams" className={navClass}>
               Equipos
-            </Link>
-
-            <Link
-              to="/tournaments"
-              className="block px-3 py-2 rounded-lg hover:bg-[#21262d] transition text-purple-300 hover:text-white"
-            >
+            </NavLink>
+            <NavLink to="/tournaments" className={navClass}>
               Torneos
-            </Link>
+            </NavLink>
           </nav>
         </div>
 
@@ -82,7 +73,7 @@ const MainLayout = () => {
       </aside>
 
       {/* Contenedor principal: mientras carga la página se muestra el loader */}
-      <main className="flex-1 overflow-y-auto bg-[#0d1117]">
+      <main className="flex-1 overflow-y-auto">
         <Suspense fallback={<LoadingScreen fullScreen={false} />}>
           <Outlet />
         </Suspense>

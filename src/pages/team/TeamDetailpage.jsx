@@ -2,31 +2,29 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
-export default function TournamentDetailPage() {
+export default function TeamDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [tournament, setTournament] = useState(null);
+    const [team, setTeam] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [registering, setRegistering] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+    const [joining, setJoining] = useState(false);
+    const [leaving, setLeaving] = useState(false);
 
     // Datos del usuario guardados al iniciar sesión (el token va en la cookie)
     const storedUser = localStorage.getItem('user');
     const user = storedUser ? JSON.parse(storedUser) : null;
 
-    // Por ahora cualquier usuario logueado puede borrar.
-    // Cuando implementes roles, cambiá esta línea por: user?.role === 'Admin'
-    const canDelete = !!user;
-
-    const fetchTournament = () => {
-        apiFetch(`/tournaments/${id}`)
+    const fetchTeam = () => {
+        apiFetch(`/teams/${id}`)
             .then(res => {
-                if (!res.ok) throw new Error('No se pudo cargar el detalle del torneo.');
+                if (res.status === 404) throw new Error('Equipo no encontrado.');
+                if (!res.ok) throw new Error('No se pudo cargar el detalle del equipo.');
                 return res.json();
             })
             .then(data => {
-                setTournament(data);
+                setTeam(data);
+                setError(null);
                 setLoading(false);
             })
             .catch(err => {
@@ -36,7 +34,7 @@ export default function TournamentDetailPage() {
     };
 
     useEffect(() => {
-        fetchTournament();
+        fetchTeam();
     }, [id]);
 
     const handleSessionExpired = () => {
@@ -45,209 +43,224 @@ export default function TournamentDetailPage() {
         navigate('/login');
     };
 
-    const handleRegister = async () => {
-        if (!user) {
-            alert('Tenés que iniciar sesión para inscribirte.');
-            navigate('/login');
-            return;
-        }
-
-        setRegistering(true);
+    // Lee la respuesta sin romper si el cuerpo viene vacío
+    const readBody = async (response) => {
+        const text = await response.text();
         try {
-            const response = await apiFetch(`/tournaments/${id}/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    userId: user.id,
-                    username: user.username,
-                    inGameName: user.username,
-                    rank: 'N/A',
-                    registeredAt: new Date().toISOString()
-                })
-            });
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al inscribirse (${response.status})`);
-            }
-
-            alert('¡Inscripción exitosa!');
-            fetchTournament();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setRegistering(false);
+            return text ? JSON.parse(text) : null;
+        } catch {
+            return null;
         }
     };
 
-    const handleDelete = async () => {
+    const handleJoin = async () => {
         if (!user) {
-            alert('Tenés que iniciar sesión para eliminar torneos.');
+            alert('Tenés que iniciar sesión para unirte a un equipo.');
             navigate('/login');
             return;
         }
 
-        const confirmed = window.confirm(
-            `¿Seguro que querés eliminar el torneo "${tournament.title}"? Esta acción no se puede deshacer.`
-        );
-        if (!confirmed) return;
-
-        setDeleting(true);
+        setJoining(true);
         try {
-            const response = await apiFetch(`/tournaments/${id}`, {
-                method: 'DELETE'
-            });
+            const response = await apiFetch(`/teams/${id}/join`, { method: 'POST' });
 
             if (response.status === 401) {
                 handleSessionExpired();
                 return;
             }
-            if (response.status === 403) {
-                throw new Error('No tenés permisos para eliminar este torneo.');
-            }
 
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
+            const data = await readBody(response);
 
             if (!response.ok) {
-                throw new Error(data?.message || `Error al eliminar (${response.status})`);
+                throw new Error(data?.message || `Error al unirse (${response.status})`);
             }
 
-            alert('Torneo eliminado con éxito.');
-            navigate('/tournaments');
+            alert(data?.message || '¡Te uniste al equipo!');
+            fetchTeam();
         } catch (err) {
             alert(err.message);
         } finally {
-            setDeleting(false);
+            setJoining(false);
         }
+    };
+
+    const handleLeave = async () => {
+        const confirmed = window.confirm(`¿Seguro que querés abandonar el equipo "${team.name}"?`);
+        if (!confirmed) return;
+
+        setLeaving(true);
+        try {
+            const response = await apiFetch(`/teams/${id}/leave`, { method: 'POST' });
+
+            if (response.status === 401) {
+                handleSessionExpired();
+                return;
+            }
+
+            const data = await readBody(response);
+
+            if (!response.ok) {
+                throw new Error(data?.message || `Error al abandonar (${response.status})`);
+            }
+
+            alert(data?.message || 'Abandonaste el equipo.');
+            fetchTeam();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setLeaving(false);
+        }
+    };
+
+    const formatDate = (value) => {
+        if (!value) return '—';
+        const date = new Date(value);
+        return isNaN(date.getTime())
+            ? '—'
+            : date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const formatLastActive = (value) => {
+        if (!value) return 'Sin actividad';
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return 'Sin actividad';
+
+        const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+        if (minutes < 5) return 'Activo ahora';
+        if (minutes < 60) return `Hace ${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `Hace ${hours} h`;
+        const days = Math.floor(hours / 24);
+        return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
     };
 
     if (loading) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
-    if (error) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-red-400">Error: {error}</div>;
-    if (!tournament) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Torneo no encontrado.</div>;
+    if (error) {
+        return (
+            <div className="flex flex-col gap-4 justify-center items-center h-screen bg-[#0d1117] text-red-400">
+                <p>Error: {error}</p>
+                <button
+                    onClick={() => navigate('/teams')}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition"
+                >
+                    Volver a equipos
+                </button>
+            </div>
+        );
+    }
+    if (!team) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Equipo no encontrado.</div>;
 
-    const isAlreadyRegistered = user
-        ? tournament.participants.some(p => p.userId === user.id)
-        : false;
+    const members = team.members || [];
+    const isMember = user ? members.some(m => m.userId === user.id) : false;
+    const isCaptain = user ? team.captainId === user.id : false;
 
     return (
         <div className="p-6 bg-[#0d1117] min-h-screen text-white">
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-5xl mx-auto">
                 <button
                     onClick={() => navigate(-1)}
                     className="text-sm text-purple-400 hover:underline mb-6 flex items-center gap-1"
                 >
-                    ← Volver a torneos
+                    ← Volver a equipos
                 </button>
 
                 {/* Banner Principal */}
                 <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-                    <div>
-                        <span className="bg-purple-600/20 text-purple-400 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-purple-500/30">
-                            {tournament.gameName}
-                        </span>
-                        <h1 className="text-3xl md:text-4xl font-extrabold mt-3 text-white">{tournament.title}</h1>
-                        <p className="text-gray-400 text-sm mt-2">Organizado por Nexus Arena • Formato Playoffs</p>
+                    <div className="flex items-center gap-5">
+                        <img
+                            src={team.logoUrl}
+                            alt={team.name}
+                            className="w-20 h-20 object-cover rounded-full border-2 border-purple-500/50 bg-gray-900"
+                        />
+                        <div>
+                            <span className="bg-purple-600/20 text-purple-400 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-purple-500/30 font-mono">
+                                [{team.tag}]
+                            </span>
+                            <h1 className="text-3xl md:text-4xl font-extrabold mt-3 text-white">{team.name}</h1>
+                            <p className="text-gray-400 text-sm mt-2">
+                                {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="flex flex-col items-start md:items-end gap-4 w-full md:w-auto">
-                        <div className="text-left md:text-right">
-                            <span className="text-xs text-gray-400 block">Pozo de Premios</span>
-                            <span className="text-3xl font-extrabold text-emerald-400">€{tournament.prizePool}</span>
-                        </div>
-
-                        <div className="flex flex-col gap-2 w-full md:w-auto">
+                    <div className="flex flex-col gap-2 w-full md:w-auto">
+                        {isMember ? (
+                            <>
+                                <span className="text-center px-6 py-3 rounded-lg font-bold bg-gray-800 text-gray-400 border border-gray-700">
+                                    {isCaptain ? 'Sos el capitán 👑' : 'Sos miembro ✓'}
+                                </span>
+                                {!isCaptain && (
+                                    <button
+                                        onClick={handleLeave}
+                                        disabled={leaving}
+                                        className="w-full md:w-auto px-6 py-3 rounded-lg font-bold transition border border-red-800 text-red-400 hover:bg-red-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {leaving ? 'Saliendo...' : 'Abandonar Equipo'}
+                                    </button>
+                                )}
+                            </>
+                        ) : (
                             <button
-                                onClick={handleRegister}
-                                disabled={isAlreadyRegistered || registering}
-                                className={`w-full md:w-auto px-6 py-3 rounded-lg font-bold transition shadow-lg ${
-                                    isAlreadyRegistered
-                                        ? 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700'
-                                        : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/40'
-                                }`}
+                                onClick={handleJoin}
+                                disabled={joining}
+                                className="w-full md:w-auto px-6 py-3 rounded-lg font-bold transition shadow-lg bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {isAlreadyRegistered ? 'Inscrito ✓' : registering ? 'Inscribiendo...' : 'Inscribirse al Torneo'}
+                                {joining ? 'Uniéndote...' : 'Unirse al Equipo'}
                             </button>
-
-                            {canDelete && (
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={deleting}
-                                    className="w-full md:w-auto px-6 py-3 rounded-lg font-bold transition border border-red-800 text-red-400 hover:bg-red-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {deleting ? 'Eliminando...' : 'Eliminar Torneo'}
-                                </button>
-                            )}
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Grid de Secciones (Reglas y Participantes) */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
-                            <h3 className="text-xl font-bold mb-4 text-white">Reglas Clave</h3>
-                            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
-                                {tournament.rules || "No se especificaron reglas adicionales para este torneo."}
-                            </p>
-                        </div>
-
-                        <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
-                            <h3 className="text-xl font-bold mb-4 text-white">Condiciones de Rango</h3>
-                            <p className="text-gray-300 text-sm leading-relaxed">
-                                {tournament.rankConditions || "Abierto a todos los rangos."}
-                            </p>
-                        </div>
+                {/* Lista de Miembros */}
+                <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold text-white">Miembros</h3>
+                        <span className="text-xs text-purple-400 font-semibold bg-purple-950/50 px-2.5 py-1 rounded-md border border-purple-800/50">
+                            {members.length}
+                        </span>
                     </div>
 
-                    {/* Columna Derecha: Lista de Inscritos */}
-                    <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6 flex flex-col h-[500px]">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-white">Inscritos</h3>
-                            <span className="text-xs text-purple-400 font-semibold bg-purple-950/50 px-2.5 py-1 rounded-md border border-purple-800/50">
-                                {tournament.participants.length} / {tournament.maxParticipants}
-                            </span>
-                        </div>
+                    {members.length === 0 ? (
+                        <p className="text-gray-500 text-sm text-center py-10">Este equipo todavía no tiene miembros.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {members.map((m) => {
+                                const isMe = user && m.userId === user.id;
+                                const memberIsCaptain = m.userId === team.captainId;
 
-                        <div className="overflow-y-auto flex-1 space-y-3 pr-1">
-                            {tournament.participants.length === 0 ? (
-                                <p className="text-gray-500 text-sm text-center py-10">Aún no hay participantes inscritos.</p>
-                            ) : (
-                                tournament.participants.map((p, index) => {
-                                    const isMe = user && p.userId === user.id;
+                                return (
+                                    <div
+                                        key={m.userId}
+                                        className="bg-gray-900/60 border border-gray-800/80 p-3 rounded-lg flex items-center justify-between text-sm hover:border-purple-600/60 transition"
+                                    >
+                                        <Link
+                                            to={isMe ? '/profile' : `/users/${m.userId}`}
+                                            className="group"
+                                            title={`Ver perfil de ${m.username}`}
+                                        >
+                                            <p className="font-semibold text-white group-hover:text-purple-400 transition flex items-center gap-2">
+                                                {m.username}
+                                                {isMe && <span className="text-[10px] bg-purple-900 text-purple-200 px-1.5 py-0.5 rounded">Tú</span>}
+                                            </p>
+                                            <p className="text-xs text-gray-400">
+                                                Desde {formatDate(m.joinedAt)} • {formatLastActive(m.lastActive)}
+                                            </p>
+                                        </Link>
 
-                                    return (
-                                        <div key={index} className="bg-gray-900/60 border border-gray-800/80 p-3 rounded-lg flex items-center justify-between text-sm hover:border-purple-600/60 transition">
-                                            {/* El nombre lleva al perfil del participante */}
-                                            <Link
-                                                to={isMe ? '/profile' : `/users/${p.userId}`}
-                                                className="group"
-                                                title={`Ver perfil de ${p.username}`}
-                                            >
-                                                <p className="font-semibold text-white group-hover:text-purple-400 transition flex items-center gap-2">
-                                                    {p.username}
-                                                    {isMe && <span className="text-[10px] bg-purple-900 text-purple-200 px-1.5 py-0.5 rounded">Tú</span>}
-                                                </p>
-                                                <p className="text-xs text-gray-400">{p.inGameName}</p>
-                                            </Link>
-                                            <span className="text-xs font-medium text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/30">
-                                                {p.rank || "N/A"}
-                                            </span>
-                                        </div>
-                                    );
-                                })
-                            )}
+                                        <span
+                                            className={`text-xs font-medium px-2 py-0.5 rounded border ${
+                                                memberIsCaptain
+                                                    ? 'text-amber-400 bg-amber-950/40 border-amber-800/30'
+                                                    : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/30'
+                                            }`}
+                                        >
+                                            {memberIsCaptain ? 'Capitán' : 'Miembro'}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

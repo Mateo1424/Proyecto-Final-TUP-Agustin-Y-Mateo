@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import '../theme.css';
 import LedBackground from '../components/layout/LedBackground';
 import LoadingScreen from '../components/layout/LoadingScreen';
+import { getStoredUser, isModerator } from '../utils/Roles';
 
 // El layout se carga normal para que el menú lateral no desaparezca al navegar
 import MainLayout from '../components/layout/MainLayout';
@@ -26,6 +27,11 @@ const TeamDetailPage = lazy(() => import('../pages/team/TeamDetailpage'));
 const ProtectedRoute = () => {
   const user = localStorage.getItem('user');
   return user ? <Outlet /> : <Navigate to="/login" replace />;
+};
+
+// Solo moderadores y administradores. El backend valida el rol igual: esto es solo para la interfaz.
+const ModeratorRoute = () => {
+  return isModerator(getStoredUser()) ? <Outlet /> : <Navigate to="/tournaments" replace />;
 };
 
 // Si ya hay sesión, evita volver a mostrar login o registro
@@ -58,7 +64,9 @@ const AppRouter = () => {
 
               {/* Rutas de Torneos */}
               <Route path="/tournaments" element={<TournamentsPage />} />
-              <Route path="/tournaments/create" element={<CreateTournament />} />
+              <Route element={<ModeratorRoute />}>
+                <Route path="/tournaments/create" element={<CreateTournament />} />
+              </Route>
               <Route path="/tournaments/:id" element={<TournamentDetailPage />} />
 
               {/* Rutas de Equipos */}
