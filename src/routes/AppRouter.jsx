@@ -18,6 +18,7 @@ const UserProfilePage = lazy(() => import('../pages/profile/UserProfilePage'));
 const TournamentsPage = lazy(() => import('../pages/Tournaments/TournamentsPage'));
 const TournamentDetailPage = lazy(() => import('../pages/Tournaments/TournamentDetailsPage'));
 const CreateTournament = lazy(() => import('../pages/Tournaments/CreateTournament'));
+const MatchDetailPage = lazy(() => import('../pages/Tournaments/MatchDetailsPage'));
 const TeamsPage = lazy(() => import('../pages/team/TeamsPage'));
 const CreateTeam = lazy(() => import('../pages/team/CreateTeam'));
 const TeamDetailPage = lazy(() => import('../pages/team/TeamDetailpage'));
@@ -68,6 +69,7 @@ const AppRouter = () => {
                 <Route path="/tournaments/create" element={<CreateTournament />} />
               </Route>
               <Route path="/tournaments/:id" element={<TournamentDetailPage />} />
+                            <Route path="/tournaments/:id/matches/:matchId" element={<MatchDetailPage />} />
 
               {/* Rutas de Equipos */}
               <Route path="/teams" element={<TeamsPage />} />

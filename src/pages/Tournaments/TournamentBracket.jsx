@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../../config';
 import { getGameRules } from '../../utils/GameRules';
+import { Link } from 'react-router-dom';
 
 const roundName = (round, totalRounds) => {
     const fromFinal = totalRounds - round;
@@ -314,6 +315,15 @@ export default function TournamentBracket({
                                                 emptyLabel={emptyLabel}
                                                 manage={manageFor('B')}
                                             />
+
+                                            {bothDefined && !match.isBye && (
+                                                <Link
+                                                    to={`/tournaments/${match.tournamentId}/matches/${match.id}`}
+                                                    className="block w-full py-1.5 text-center text-[11px] font-semibold text-gray-400 hover:text-purple-300 hover:bg-purple-950/30 border-t border-gray-800/80 transition"
+                                                >
+                                                    Ver estadísticas →
+                                                </Link>
+                                            )}
 
                                             {match.isBye && (
                                                 <p className="text-[10px] text-center text-gray-500 py-1 border-t border-gray-800/80">
