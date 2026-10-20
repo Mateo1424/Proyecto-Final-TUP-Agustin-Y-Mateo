@@ -9,15 +9,19 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Estado de control para editar perfil (estadísticas y avatar)
+  // Estados de control para editar perfil (estadísticas y avatar)
   const [isEditing, setIsEditing] = useState(false);
   const [statsForm, setStatsForm] = useState({ wins: 0, losses: 0, draws: 0 });
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Estados para gestionar Juegos (RF-06, RF-07, RF-08)
+  const [showGameModal, setShowGameModal] = useState(false);
+  const [gameForm, setGameForm] = useState({ gameName: 'League of Legends', inGameName: '', rank: '' });
+  const [isEditingGame, setIsEditingGame] = useState(false);
+
   const fetchProfileAndTeam = async () => {
     try {
-      // 1. Cargar Perfil (la sesión viaja en la cookie)
       const profileResponse = await apiFetch('/profile/me');
 
       if (profileResponse.status === 401) {
@@ -40,12 +44,10 @@ const ProfilePage = () => {
       });
       setAvatarUrlInput(profileData.avatarUrl || '');
 
-      // 2. Cargar Equipos para verificar si el usuario pertenece a uno
       const teamsResponse = await apiFetch('/teams');
 
       if (teamsResponse.ok) {
         const teamsData = await teamsResponse.json();
-        // Buscamos un equipo donde el usuario sea miembro (o capitán) por ID o nombre de usuario
         const foundTeam = teamsData.find(team => 
           team.members?.some(m => m.userId === profileData.id || m.UserId === profileData.id || m.username === profileData.username)
         );
@@ -103,6 +105,56 @@ const ProfilePage = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Guardar o Actualizar Videojuego (RF-06 y RF-07)
+  const handleSaveGame = async (e) => {
+    e.preventDefault();
+    try {
+      const method = isEditingGame ? 'PUT' : 'POST';
+      const response = await apiFetch('/profile/games', {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gameForm)
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al guardar el videojuego.');
+
+      setProfile(prev => ({ ...prev, games: data.games }));
+      setShowGameModal(false);
+      setGameForm({ gameName: 'League of Legends', inGameName: '', rank: '' });
+      setIsEditingGame(false);
+      alert(data.message);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Eliminar Videojuego (RF-08)
+  const handleDeleteGame = async (gameName) => {
+    if (!window.confirm(`¿Estás seguro de eliminar ${gameName} de tu perfil?`)) return;
+
+    try {
+      const response = await apiFetch(`/profile/games/${encodeURIComponent(gameName)}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al eliminar el videojuego.');
+
+      setProfile(prev => ({ ...prev, games: data.games }));
+      alert('Videojuego eliminado con éxito.');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Abrir modal para editar juego existente
+  const openEditGame = (game) => {
+    setGameForm({ gameName: game.gameName, inGameName: game.inGameName, rank: game.rank });
+    setIsEditingGame(true);
+    setShowGameModal(true);
   };
 
   if (loading) return <div className="p-8 text-white">Cargando perfil...</div>;
@@ -217,24 +269,50 @@ const ProfilePage = () => {
       {/* Grid de Secciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Sección: Juego Principal */}
+        {/* Sección: Videojuegos (RF-05, RF-06, RF-07, RF-08) */}
         <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800 space-y-4">
-          <h3 className="text-lg font-semibold text-white">Juego Principal</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Videojuegos Asociados</h3>
+            <button
+              onClick={() => {
+                setGameForm({ gameName: 'League of Legends', inGameName: '', rank: '' });
+                setIsEditingGame(false);
+                setShowGameModal(true);
+              }}
+              className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition cursor-pointer"
+            >
+              + Vincular Juego
+            </button>
+          </div>
+
           <div className="space-y-3">
             {profile?.games && profile.games.length > 0 ? (
               profile.games.map((game, index) => (
                 <div key={index} className="bg-[#0d1117] p-4 rounded-lg border border-gray-800/80 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-white text-sm">{game.gameName}</h4>
-                    <p className="text-xs text-purple-400 mt-0.5">In-Game: {game.inGameName || 'N/A'} • Rango: {game.rank || 'Unranked'}</p>
+                    <p className="text-xs text-purple-400 mt-0.5">
+                      In-Game: <span className="text-gray-200 font-medium">{game.inGameName || 'N/A'}</span> | Rango: <span className="text-emerald-400 font-medium">{game.rank || 'Unranked'}</span>
+                    </p>
                   </div>
-                  <span className="text-xs bg-purple-950/60 text-purple-300 px-2.5 py-1 rounded border border-purple-800/40">
-                    Vinculado
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEditGame(game)}
+                      className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded transition"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteGame(game.gameName)}
+                      className="text-xs bg-red-950/60 hover:bg-red-900 text-red-300 px-2.5 py-1 rounded border border-red-800/40 transition"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <p className="text-xs text-gray-400">No hay juegos vinculados en tu cuenta.</p>
+              <p className="text-xs text-gray-400">No hay videojuegos vinculados en tu cuenta.</p>
             )}
           </div>
         </section>
@@ -285,13 +363,73 @@ const ProfilePage = () => {
 
       </div>
 
-      {/* Historial de Torneos */}
-      <div className="grid grid-cols-1 gap-6">
-        <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800">
-          <h3 className="text-lg font-semibold text-white mb-4">Historial de Torneos</h3>
-          <p className="text-xs text-gray-400">Próximamente podrás ver aquí todas tus participaciones oficiales sincronizadas desde MongoDB.</p>
-        </section>
-      </div>
+      {/* Modal para Vincular/Modificar Videojuego */}
+      {showGameModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6 max-w-md w-full space-y-4">
+            <h3 className="text-lg font-bold text-white">
+              {isEditingGame ? 'Modificar Videojuego' : 'Vincular Nuevo Videojuego'}
+            </h3>
+            <form onSubmit={handleSaveGame} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Videojuego</label>
+                <select
+                  disabled={isEditingGame}
+                  value={gameForm.gameName}
+                  onChange={(e) => setGameForm({ ...gameForm, gameName: e.target.value })}
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                >
+                  <option value="League of Legends">League of Legends</option>
+                  <option value="Valorant">Valorant</option>
+                  <option value="CS:GO">CS:GO</option>
+                  <option value="Rocket League">Rocket League</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Nombre de Usuario en el Juego (In-Game Name)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: PlayerOne#EUW"
+                  value={gameForm.inGameName}
+                  onChange={(e) => setGameForm({ ...gameForm, inGameName: e.target.value })}
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Rango o Nivel</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Diamante II / Immortal"
+                  value={gameForm.rank}
+                  onChange={(e) => setGameForm({ ...gameForm, rank: e.target.value })}
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGameModal(false)}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"
+                >
+                  {isEditingGame ? 'Guardar Cambios' : 'Vincular'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
