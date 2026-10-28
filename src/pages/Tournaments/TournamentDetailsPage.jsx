@@ -15,6 +15,8 @@ export default function TournamentDetailPage() {
     const [deleting, setDeleting] = useState(false);
     const [generating, setGenerating] = useState(false);
     const [disqualifyingId, setDisqualifyingId] = useState(null);
+    const [userTeams, setUserTeams] = useState([]);
+    const [registeringTeam, setRegisteringTeam] = useState(false);
 
     // Datos del usuario guardados al iniciar sesión (el token va en la cookie)
     const user = getStoredUser();
@@ -46,9 +48,23 @@ export default function TournamentDetailPage() {
             .catch(() => setMatches([]));
     };
 
+    const fetchUserTeams = () => {
+        if (!user) return;
+        apiFetch('/teams')
+            .then(res => (res.ok ? res.json() : []))
+            .then(data => {
+                if (Array.isArray(data)) {
+                    const mine = data.filter(t => t.members?.some(m => m.userId === user.id));
+                    setUserTeams(mine);
+                }
+            })
+            .catch(() => setUserTeams([]));
+    };
+
     const refreshAll = () => {
         fetchTournament();
         fetchMatches();
+        fetchUserTeams();
     };
 
     useEffect(() => {
@@ -109,6 +125,44 @@ export default function TournamentDetailPage() {
             alert(err.message);
         } finally {
             setRegistering(false);
+        }
+    };
+
+    const handleRegisterTeam = async (teamId) => {
+        if (!user) {
+            alert('Tenés que iniciar sesión para inscribirte.');
+            navigate('/login');
+            return;
+        }
+
+        setRegisteringTeam(true);
+        try {
+            const response = await apiFetch(`/tournaments/${id}/register-team`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ teamId })
+            });
+
+            if (response.status === 401) {
+                handleSessionExpired();
+                return;
+            }
+
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : null;
+
+            if (!response.ok) {
+                throw new Error(data?.message || `Error al inscribir equipo (${response.status})`);
+            }
+
+            alert('¡Equipo inscripto exitosamente!');
+            fetchTournament();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setRegisteringTeam(false);
         }
     };
 
@@ -249,8 +303,15 @@ export default function TournamentDetailPage() {
         ? tournament.participants.some(p => p.userId === user.id)
         : false;
 
+    const isAlreadyRegisteredAsTeam = user
+        ? tournament.participants.some(p => p.teamId && userTeams.some(t => t.id === p.teamId))
+        : false;
+
     // Las inscripciones se cierran cuando el torneo deja de estar en "Próximo"
     const registrationClosed = tournament.status !== 'Próximo';
+    const now = new Date();
+    const start = tournament.startDate ? new Date(tournament.startDate) : null;
+    const registrationNotOpenYet = start ? now < new Date(start.getTime() - 30 * 60 * 1000) : false;
 
     // Los resultados se cargan mientras el torneo está en juego (o para corregir la final)
     const canManageResults = isModerator && (tournament.status === 'En curso' || tournament.status === 'Finalizado');

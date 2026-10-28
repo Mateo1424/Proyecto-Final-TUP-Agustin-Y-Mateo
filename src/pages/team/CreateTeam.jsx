@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
+const GAME_OPTIONS = ['League of Legends', 'Valorant', 'CS:GO', 'Rocket League'];
+
 export default function CreateTeam() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     tag: '',
-    logoUrl: ''
+    logoUrl: '',
+    gameName: 'Valorant'
   });
 
   const handleChange = (e) => {
@@ -53,6 +56,22 @@ export default function CreateTeam() {
     <div className="p-6 text-white max-w-xl mx-auto">
       <h2 className="text-3xl font-extrabold mb-6 tracking-wide">Crear Nuevo Equipo</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-semibold mb-1">Videojuego *</label>
+          <select
+            name="gameName"
+            value={formData.gameName}
+            onChange={handleChange}
+            className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none"
+            required
+          >
+            {GAME_OPTIONS.map((game) => (
+              <option key={game} value={game}>{game}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Debés tener este juego asociado a tu perfil con nombre y rango para crear el equipo.</p>
+        </div>
+
         <div>
           <label className="block text-sm font-semibold mb-1">Nombre del Equipo</label>
           <input 

@@ -49,6 +49,7 @@ export default function CreateTournament() {
   const [formData, setFormData] = useState({
     title: '',
     gameName: 'Valorant',
+    tournamentType: 'Individual',
     description: '',
     startDate: '',
     endDate: '',
@@ -142,6 +143,26 @@ export default function CreateTournament() {
       <h2 className="text-3xl font-extrabold mb-6 tracking-wide">Crear Nuevo Torneo</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         
+        <div>
+          <label className="block text-sm font-semibold mb-3">Tipo de Torneo</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+              onClick={() => setFormData({ ...formData, tournamentType: 'Individual' })}
+              className={`cursor-pointer border rounded-xl p-4 transition ${formData.tournamentType === 'Individual' ? 'border-purple-500 bg-purple-950/30' : 'border-gray-800 bg-[#161b22] hover:border-gray-600'}`}
+            >
+              <div className="font-bold">Individual</div>
+              <div className="text-xs text-gray-400">Inscripción por jugador</div>
+            </div>
+            <div
+              onClick={() => setFormData({ ...formData, tournamentType: 'Equipo' })}
+              className={`cursor-pointer border rounded-xl p-4 transition ${formData.tournamentType === 'Equipo' ? 'border-purple-500 bg-purple-950/30' : 'border-gray-800 bg-[#161b22] hover:border-gray-600'}`}
+            >
+              <div className="font-bold">Por Equipos</div>
+              <div className="text-xs text-gray-400">5 titulares + 2 suplentes (solo capitán inscribe)</div>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-semibold mb-3">Selecciona el Juego</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
