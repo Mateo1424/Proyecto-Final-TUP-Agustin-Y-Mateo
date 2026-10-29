@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 import '../theme.css';
@@ -7,6 +7,7 @@ import LoadingScreen from '../components/layout/LoadingScreen';
 import { getStoredUser, isModerator } from '../utils/Roles';
 
 import MainLayout from '../components/layout/MainLayout';
+import SessionRoute from '../components/SessionRoute';
 
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/RegisterPage'));
@@ -22,18 +23,8 @@ const CreateTeam = lazy(() => import('../pages/team/CreateTeam'));
 const TeamDetailPage = lazy(() => import('../pages/team/TeamDetailpage'));
 const Leaderboard = lazy(() => import('../components/layout/Rankings/Leaderboard'));
 
-const ProtectedRoute = () => {
-  const user = localStorage.getItem('user');
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
-};
-
 const ModeratorRoute = () => {
   return isModerator(getStoredUser()) ? <Outlet /> : <Navigate to="/tournaments" replace />;
-};
-
-const PublicOnlyRoute = () => {
-  const user = localStorage.getItem('user');
-  return user ? <Navigate to="/dashboard" replace /> : <Outlet />;
 };
 
 const AppRouter = () => {
@@ -43,12 +34,12 @@ const AppRouter = () => {
 
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route element={<PublicOnlyRoute />}>
+          <Route element={<SessionRoute key="public" authenticated={false} />}>
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute />}>
+          <Route element={<SessionRoute key="private" authenticated />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
