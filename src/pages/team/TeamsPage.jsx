@@ -65,6 +65,7 @@ export default function TeamsPage() {
         </Link>
       </div>
 
+      <Link to="/team-invitations" className="inline-block mb-5 text-purple-300 hover:underline">Ver mis invitaciones a equipos →</Link>
       {teams.length === 0 ? (
         <div className="text-center py-12 bg-[#161b22] border border-gray-800 rounded-xl">
           <p className="text-gray-400 mb-4">No hay equipos creados todavía.</p>
@@ -84,6 +85,7 @@ export default function TeamsPage() {
                     className="w-14 h-14 object-cover rounded-full border border-purple-500/50 bg-gray-900"
                   />
                   <div>
+                    <span className="text-xs text-gray-300">{team.isPrivate ? 'Privado · Por invitación' : 'Público'}</span>
                     <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition">{team.name}</h3>
                     <span className="text-xs bg-purple-950 text-purple-400 px-2 py-0.5 rounded font-mono border border-purple-800">
                       [{team.tag}]
