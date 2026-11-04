@@ -1,14 +1,22 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
+
+const GAME_OPTIONS = ['League of Legends', 'Valorant', 'CS:GO', 'Rocket League'];
 
 export default function CreateTeam() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     tag: '',
-    logoUrl: ''
+    logoUrl: '',
+    gameName: 'Valorant',
+    isPrivate: false
   });
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const submitLock = useRef(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -16,6 +24,7 @@ export default function CreateTeam() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLock.current) return;
 
     if (!localStorage.getItem('user')) {
       alert('Debes iniciar sesión para crear un equipo.');
@@ -23,6 +32,9 @@ export default function CreateTeam() {
       return;
     }
 
+    submitLock.current = true;
+    setSaving(true);
+    setError('');
     try {
       const response = await apiFetch('/teams', {
         method: 'POST',
@@ -41,11 +53,14 @@ export default function CreateTeam() {
         navigate('/login');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(`Error al crear el equipo: ${errorData.message || 'Verifica los datos'}`);
+        setError(errorData.message || 'No se pudo crear el equipo. Verificá los datos.');
       }
     } catch (error) {
       console.error('Error de red:', error);
-      alert('Error de conexión con el servidor.');
+      setError('Error de conexión con el servidor.');
+    } finally {
+      submitLock.current = false;
+      setSaving(false);
     }
   };
 
@@ -53,6 +68,22 @@ export default function CreateTeam() {
     <div className="p-6 text-white max-w-xl mx-auto">
       <h2 className="text-3xl font-extrabold mb-6 tracking-wide">Crear Nuevo Equipo</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-semibold mb-1">Videojuego *</label>
+          <select
+            name="gameName"
+            value={formData.gameName}
+            onChange={handleChange}
+            className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none"
+            required
+          >
+            {GAME_OPTIONS.map((game) => (
+              <option key={game} value={game}>{game}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Debés tener este juego asociado a tu perfil con nombre y rango para crear el equipo.</p>
+        </div>
+
         <div>
           <label className="block text-sm font-semibold mb-1">Nombre del Equipo</label>
           <input 
@@ -85,8 +116,17 @@ export default function CreateTeam() {
           />
         </div>
 
-        <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40">
-          Guardar y Crear Equipo
+        <div>
+          <label htmlFor="team-privacy" className="block text-sm font-semibold mb-1">Privacidad</label>
+          <select id="team-privacy" value={String(formData.isPrivate)} onChange={e => setFormData({ ...formData, isPrivate: e.target.value === 'true' })} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg">
+            <option value="false">Público</option>
+            <option value="true">Privado</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">Los equipos privados se ven en el listado, pero requieren una invitación para ingresar.</p>
+        </div>
+        {error && <p role="alert" className="text-red-400">{error}</p>}
+        <button disabled={saving} type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40">
+          {saving ? 'Creando...' : 'Guardar y Crear Equipo'}
         </button>
       </form>
     </div>

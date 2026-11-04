@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
+import { getStoredUser } from '../../utils/Roles';
+import TeamInvitationsPanel from '../../components/team/TeamInvitationsPanel';
 
 export default function TeamDetailPage() {
     const { id } = useParams();
@@ -10,15 +12,16 @@ export default function TeamDetailPage() {
     const [error, setError] = useState(null);
     const [joining, setJoining] = useState(false);
     const [leaving, setLeaving] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const actionLock = useRef(false);
 
     // Estados de edición para el capitán (RF-10)
     const [isEditingTeam, setIsEditingTeam] = useState(false);
-    const [editTeamForm, setEditTeamForm] = useState({ name: '', tag: '', logoUrl: '' });
+    const [editTeamForm, setEditTeamForm] = useState({ name: '', tag: '', logoUrl: '', isPrivate: false });
 
-    const storedUser = localStorage.getItem('user');
-    const user = storedUser ? JSON.parse(storedUser) : null;
+    const user = getStoredUser();
 
-    const fetchTeam = () => {
+    const fetchTeam = useCallback(() => {
         apiFetch(`/teams/${id}`)
             .then(res => {
                 if (res.status === 404) throw new Error('Equipo no encontrado.');
@@ -27,7 +30,7 @@ export default function TeamDetailPage() {
             })
             .then(data => {
                 setTeam(data);
-                setEditTeamForm({ name: data.name, tag: data.tag, logoUrl: data.logoUrl });
+                setEditTeamForm({ name: data.name, tag: data.tag, logoUrl: data.logoUrl, isPrivate: Boolean(data.isPrivate) });
                 setError(null);
                 setLoading(false);
             })
@@ -35,11 +38,11 @@ export default function TeamDetailPage() {
                 setError(err.message);
                 setLoading(false);
             });
-    };
+    }, [id]);
 
     useEffect(() => {
         fetchTeam();
-    }, [id]);
+    }, [fetchTeam]);
 
     const handleSessionExpired = () => {
         localStorage.removeItem('user');
@@ -57,12 +60,14 @@ export default function TeamDetailPage() {
     };
 
     const handleJoin = async () => {
+        if (team?.isPrivate || actionLock.current) return;
         if (!user) {
             alert('Tenés que iniciar sesión para unirte a un equipo.');
             navigate('/login');
             return;
         }
 
+        actionLock.current = true;
         setJoining(true);
         try {
             const response = await apiFetch(`/teams/${id}/join`, { method: 'POST' });
@@ -74,6 +79,7 @@ export default function TeamDetailPage() {
         } catch (err) {
             alert(err.message);
         } finally {
+            actionLock.current = false;
             setJoining(false);
         }
     };
@@ -99,6 +105,9 @@ export default function TeamDetailPage() {
     // RF-10: Guardar cambios del equipo
     const handleUpdateTeamSubmit = async (e) => {
         e.preventDefault();
+        if (actionLock.current) return;
+        actionLock.current = true;
+        setSaving(true);
         try {
             const response = await apiFetch(`/teams/${id}`, {
                 method: 'PUT',
@@ -112,6 +121,9 @@ export default function TeamDetailPage() {
             fetchTeam();
         } catch (err) {
             alert(err.message);
+        } finally {
+            actionLock.current = false;
+            setSaving(false);
         }
     };
 
@@ -144,7 +156,7 @@ export default function TeamDetailPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
+    if (loading || (team && team.id !== id)) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
     if (error) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-red-400">Error: {error}</div>;
     if (!team) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Equipo no encontrado.</div>;
 
@@ -168,7 +180,7 @@ export default function TeamDetailPage() {
                                 [{team.tag}]
                             </span>
                             <h1 className="text-3xl font-extrabold mt-2 text-white">{team.name}</h1>
-                            <p className="text-gray-400 text-sm mt-1">{members.length} miembros</p>
+                            <p className="text-gray-400 text-sm mt-1">{members.length} miembros · {team.isPrivate ? 'Privado · Por invitación' : 'Público'}</p>
                         </div>
                     </div>
 
@@ -184,6 +196,11 @@ export default function TeamDetailPage() {
                                     {leaving ? 'Saliendo...' : 'Abandonar Equipo'}
                                 </button>
                             )
+                        ) : team.isPrivate ? (
+                            <div className="text-sm text-gray-400 max-w-xs">
+                                Este equipo es privado. Necesitás una invitación del capitán para ingresar.
+                                <Link to="/team-invitations" className="block mt-2 text-purple-300 hover:underline">Ver mis invitaciones</Link>
+                            </div>
                         ) : (
                             <button onClick={handleJoin} disabled={joining} className="px-6 py-3 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-lg shadow-purple-900/40">
                                 {joining ? 'Uniéndote...' : 'Unirse al Equipo'}
@@ -193,7 +210,7 @@ export default function TeamDetailPage() {
                 </div>
 
                 {/* Panel de edición de equipo (RF-10) */}
-                {isEditingTeam && (
+                {isCaptain && isEditingTeam && (
                     <form onSubmit={handleUpdateTeamSubmit} className="bg-[#161b22] border border-purple-500/40 p-6 rounded-xl space-y-4">
                         <h3 className="text-lg font-bold text-white">Configuración del Equipo</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -210,9 +227,19 @@ export default function TeamDetailPage() {
                                 <input type="text" value={editTeamForm.logoUrl} onChange={e => setEditTeamForm({...editTeamForm, logoUrl: e.target.value})} className="w-full bg-[#0d1117] border border-gray-800 p-2 rounded text-sm text-white" />
                             </div>
                         </div>
-                        <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-4 py-2 rounded font-bold">Guardar Cambios</button>
+                        <div>
+                            <label htmlFor="edit-team-privacy" className="block text-xs text-gray-400 mb-1">Privacidad</label>
+                            <select id="edit-team-privacy" value={String(editTeamForm.isPrivate)} onChange={e => setEditTeamForm({ ...editTeamForm, isPrivate: e.target.value === 'true' })} className="w-full bg-[#0d1117] border border-gray-800 p-2 rounded text-sm">
+                                <option value="false">Público</option>
+                                <option value="true">Privado</option>
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Privado exige invitación; el equipo y sus integrantes siguen siendo visibles. Cambiar esta opción no expulsa miembros.</p>
+                        </div>
+                        <button disabled={saving} type="submit" className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-4 py-2 rounded font-bold">{saving ? 'Guardando...' : 'Guardar Cambios'}</button>
                     </form>
                 )}
+
+                {isCaptain && <TeamInvitationsPanel key={team.id} teamId={team.id} />}
 
                 {/* Lista de Miembros con gestión de Titulares/Suplentes y Expulsión */}
                 <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
