@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
@@ -57,7 +57,7 @@ const UserProfilePage = () => {
     };
 
     fetchUserProfile();
-  }, [id]);
+  }, [id, navigate]);
 
   if (loading) return <div className="p-8 text-white">Cargando perfil...</div>;
   if (error) {

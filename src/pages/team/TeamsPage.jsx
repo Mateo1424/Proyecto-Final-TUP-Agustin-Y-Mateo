@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
@@ -7,31 +7,29 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadTeams = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await apiFetch('/teams');
-      if (!res.ok) {
-        throw new Error(`No se pudieron cargar los equipos (error ${res.status}).`);
-      }
-      const data = await res.json();
-      setTeams(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error al cargar equipos:', err);
-      setError(
-        err instanceof TypeError
-          ? 'No se pudo conectar con el servidor. ¿Está corriendo el backend?'
-          : err.message
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadTeams = useCallback(() => {
+    apiFetch('/teams')
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`No se pudieron cargar los equipos (error ${res.status}).`);
+        }
+        return res.json();
+      })
+      .then(data => setTeams(Array.isArray(data) ? data : []))
+      .catch(err => {
+        console.error('Error al cargar equipos:', err);
+        setError(
+          err instanceof TypeError
+            ? 'No se pudo conectar con el servidor. ¿Está corriendo el backend?'
+            : err.message
+        );
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     loadTeams();
-  }, []);
+  }, [loadTeams]);
 
   if (loading) {
     return <div className="p-6 text-white text-center">Cargando equipos...</div>;
@@ -44,7 +42,11 @@ export default function TeamsPage() {
           {error}
         </div>
         <button
-          onClick={loadTeams}
+          onClick={() => {
+            setLoading(true);
+            setError('');
+            loadTeams();
+          }}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition cursor-pointer"
         >
           Reintentar

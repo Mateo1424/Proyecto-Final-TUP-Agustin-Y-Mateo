@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { getStoredUser, isModerator as checkModerator } from '../../utils/Roles';
@@ -34,10 +34,8 @@ function StatEditor({ value, step, max, disabled, onCommit }) {
     const [draft, setDraft] = useState(String(value));
     const [focused, setFocused] = useState(false);
 
-    // Si el valor cambia desde el servidor y no se está escribiendo, se sincroniza
-    useEffect(() => {
-        if (!focused) setDraft(String(value));
-    }, [value, focused]);
+    // Mientras no se está escribiendo mostramos el valor del servidor
+    const shown = focused ? draft : String(value);
 
     const clamp = (n) => {
         let v = Math.max(0, Math.round(n));
@@ -60,9 +58,12 @@ function StatEditor({ value, step, max, disabled, onCommit }) {
                 type="number"
                 min={0}
                 max={max ?? undefined}
-                value={draft}
+                value={shown}
                 disabled={disabled}
-                onFocus={() => setFocused(true)}
+                onFocus={() => {
+                    setDraft(String(value));
+                    setFocused(true);
+                }}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => {
                     setFocused(false);

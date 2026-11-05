@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
+import { isModerator as checkModerator } from '../../utils/Roles';
 
 export default function TeamDetailPage() {
     const { id } = useParams();
@@ -10,6 +11,7 @@ export default function TeamDetailPage() {
     const [error, setError] = useState(null);
     const [joining, setJoining] = useState(false);
     const [leaving, setLeaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Estados de edición para el capitán (RF-10)
     const [isEditingTeam, setIsEditingTeam] = useState(false);
@@ -17,8 +19,9 @@ export default function TeamDetailPage() {
 
     const storedUser = localStorage.getItem('user');
     const user = storedUser ? JSON.parse(storedUser) : null;
+    const isModerator = checkModerator(user);
 
-    const fetchTeam = () => {
+    const fetchTeam = useCallback(() => {
         apiFetch(`/teams/${id}`)
             .then(res => {
                 if (res.status === 404) throw new Error('Equipo no encontrado.');
@@ -35,11 +38,11 @@ export default function TeamDetailPage() {
                 setError(err.message);
                 setLoading(false);
             });
-    };
+    }, [id]);
 
     useEffect(() => {
         fetchTeam();
-    }, [id]);
+    }, [fetchTeam]);
 
     const handleSessionExpired = () => {
         localStorage.removeItem('user');
@@ -79,7 +82,10 @@ export default function TeamDetailPage() {
     };
 
     const handleLeave = async () => {
-        if (!window.confirm(`¿Seguro que querés abandonar el equipo "${team.name}"?`)) return;
+        const captainWarning = team.captainId === user?.id
+            ? '\n\nSos el capitán: si hay otros integrantes, la capitanía pasará a otro miembro. Si sos el único, el equipo se eliminará.'
+            : '';
+        if (!window.confirm(`¿Seguro que querés abandonar el equipo "${team.name}"?${captainWarning}`)) return;
 
         setLeaving(true);
         try {
@@ -87,12 +93,32 @@ export default function TeamDetailPage() {
             if (response.status === 401) { handleSessionExpired(); return; }
             const data = await readBody(response);
             if (!response.ok) throw new Error(data?.message || 'Error al abandonar');
-            alert('Abandonaste el equipo.');
-            fetchTeam();
+            alert(data?.message || 'Abandonaste el equipo.');
+            // El equipo pudo haberse eliminado (si eras el único), así que volvemos atrás.
+            navigate(-1);
         } catch (err) {
             alert(err.message);
         } finally {
             setLeaving(false);
+        }
+    };
+
+    // Eliminar equipo (moderador o capitán). El backend valida los permisos igual.
+    const handleDeleteTeam = async () => {
+        if (!window.confirm(`¿Eliminar el equipo "${team.name}"? Esta acción no se puede deshacer.`)) return;
+
+        setDeleting(true);
+        try {
+            const response = await apiFetch(`/teams/${id}`, { method: 'DELETE' });
+            if (response.status === 401) { handleSessionExpired(); return; }
+            const data = await readBody(response);
+            if (!response.ok) throw new Error(data?.message || `Error al eliminar el equipo (${response.status})`);
+            alert(data?.message || 'Equipo eliminado.');
+            navigate(-1);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -151,6 +177,7 @@ export default function TeamDetailPage() {
     const members = team.members || [];
     const isMember = user ? members.some(m => m.userId === user.id) : false;
     const isCaptain = user ? team.captainId === user.id : false;
+    const canDeleteTeam = isModerator || isCaptain;
 
     return (
         <div className="p-6 bg-[#0d1117] min-h-screen text-white">
@@ -179,14 +206,17 @@ export default function TeamDetailPage() {
                             </button>
                         )}
                         {isMember ? (
-                            !isCaptain && (
-                                <button onClick={handleLeave} disabled={leaving} className="px-6 py-2.5 rounded-lg font-bold border border-red-800 text-red-400 hover:bg-red-950/50 transition">
-                                    {leaving ? 'Saliendo...' : 'Abandonar Equipo'}
-                                </button>
-                            )
+                            <button onClick={handleLeave} disabled={leaving} className="px-6 py-2.5 rounded-lg font-bold border border-red-800 text-red-400 hover:bg-red-950/50 transition disabled:opacity-50">
+                                {leaving ? 'Saliendo...' : 'Abandonar Equipo'}
+                            </button>
                         ) : (
                             <button onClick={handleJoin} disabled={joining} className="px-6 py-3 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-lg shadow-purple-900/40">
                                 {joining ? 'Uniéndote...' : 'Unirse al Equipo'}
+                            </button>
+                        )}
+                        {canDeleteTeam && (
+                            <button onClick={handleDeleteTeam} disabled={deleting} className="px-6 py-2.5 rounded-lg font-bold bg-red-950 hover:bg-red-900 text-red-300 border border-red-800/60 transition disabled:opacity-50">
+                                {deleting ? 'Eliminando...' : 'Eliminar Equipo'}
                             </button>
                         )}
                     </div>
@@ -239,14 +269,14 @@ export default function TeamDetailPage() {
                                         {/* Controles exclusivos del Capitán (RF-13, RF-15) */}
                                         {isCaptain && !memberIsCaptain && (
                                             <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={() => handleToggleStarter(m)} 
+                                                <button
+                                                    onClick={() => handleToggleStarter(m)}
                                                     className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-gray-300 transition"
                                                 >
                                                     Cambiar a {m.isStarter ? 'Suplente' : 'Titular'}
                                                 </button>
-                                                <button 
-                                                    onClick={() => handleRemoveMember(m.userId, m.username)} 
+                                                <button
+                                                    onClick={() => handleRemoveMember(m.userId, m.username)}
                                                     className="text-xs bg-red-950 hover:bg-red-900 text-red-300 px-3 py-1.5 rounded border border-red-800/50 transition"
                                                 >
                                                     Expulsar

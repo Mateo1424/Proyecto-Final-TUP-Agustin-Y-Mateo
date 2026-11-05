@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import LoadingScreen from './LoadingScreen';
@@ -12,14 +12,6 @@ const navClass = ({ isActive }) =>
 const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [navigating, setNavigating] = useState(false);
-
-  // Barra de progreso breve en cada cambio de página
-  useEffect(() => {
-    setNavigating(true);
-    const timer = setTimeout(() => setNavigating(false), 500);
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
 
   // Pide al backend que borre la cookie de sesión y limpia los datos locales
   const handleLogout = async () => {
@@ -37,7 +29,8 @@ const MainLayout = () => {
 
   return (
     <div className="flex h-screen text-white overflow-hidden">
-      {navigating && <div key={location.pathname} className="led-progress" />}
+      {/* La key reinicia la animación de la barra en cada cambio de ruta */}
+      <div key={location.pathname} className="led-progress" />
 
       {/* Sidebar / Barra lateral */}
       <aside className="w-64 bg-[#161b22] border-r border-gray-800 flex flex-col justify-between">

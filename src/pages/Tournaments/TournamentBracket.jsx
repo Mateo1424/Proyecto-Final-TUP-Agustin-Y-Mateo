@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { apiFetch } from '../../config';
 import { getGameRules } from '../../utils/GameRules';
 import { Link } from 'react-router-dom';
@@ -15,8 +15,7 @@ const smallBtn =
     'w-6 h-6 flex items-center justify-center rounded border text-xs font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 
 function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, isDisqualified, manage }) {
-    return (
-        <div
+    return (        <div
             className={`flex items-center justify-between gap-2 px-3 py-2 text-sm ${
                 isWinner ? 'bg-purple-600/20 text-white font-semibold' : ''
             } ${isEliminated || isDisqualified ? 'text-gray-500' : 'text-gray-200'}`}
@@ -79,6 +78,19 @@ function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, is
                     >
                         ✕
                     </button>
+
+                    {/* Nueva función: Avanzar ganador manualmente (RF-28) */}
+                    {manage.canAdvanceWinner && (
+                        <button
+                            type="button"
+                            disabled={manage.busy}
+                            onClick={() => manage.onAdvanceWinner()}
+                            title="Avanzar ganador a siguiente ronda"
+                            className={`${smallBtn} border-purple-700 text-purple-300 hover:bg-purple-950/40`}
+                        >
+                            ⇉
+                        </button>
+                    )}
                 </span>
             ) : (
                 <span className="font-mono text-xs text-gray-400">{score ?? ''}</span>
@@ -178,7 +190,7 @@ export default function TournamentBracket({
         ? [finalMatch.playerA, finalMatch.playerB].find(p => p?.userId === finalMatch.winnerUserId)
         : null;
 
-    // Llama al backend; si responde con las llaves actualizadas, se las pasa a la página
+    // Llama al backend
     const callApi = async (path, options) => {
         setBusy(true);
         setError('');
@@ -231,6 +243,16 @@ export default function TournamentBracket({
         await setResult(match, match.scoreA ?? 0, match.scoreB ?? 0, winner.userId);
     };
 
+    const callAdvanceWinnerApi = async (match) => {
+        const confirmed = window.confirm(
+            `¿Confirmás avanzar al ganador "${match.winnerUserId ? '...' : 'pendiente'}" a la siguiente ronda?`
+        );
+        if (!confirmed) return;
+        await callApi(`/tournaments/${match.tournamentId}/matches/${match.id}/advance`, {
+            method: 'POST'
+        });
+    };
+
     return (
         <div className="space-y-4">
             {champion && (
@@ -247,6 +269,7 @@ export default function TournamentBracket({
                     {rules.winScore ? `; gana solo al llegar a ${rules.winScore}` : '; en este juego el ganador se declara a mano'}
                     ). <span className="text-emerald-400 font-bold">✓</span> declara ganador y avanza.{' '}
                     <span className="text-red-400 font-bold">✕</span> lo da por perdedor y avanza al rival.
+                    {rules.canAdvanceWinner ? ` <span className="text-purple-400 font-bold">⇉</span> avanza ganador manualmente.` : ''}
                 </div>
             )}
 
@@ -285,7 +308,12 @@ export default function TournamentBracket({
                                             busy,
                                             onScore: (delta) => adjustScore(match, side, delta),
                                             onWin: () => declareWinner(match, me, rival),
-                                            onLose: () => declareWinner(match, rival, me)
+                                            onLose: () => declareWinner(match, rival, me),
+                                            // RF-28: puede avanzar ganador (solo si el partido ya tiene ganador definido)
+                                            onAdvanceWinner: () => {
+                                                if (!hasWinner || isEditing) return;
+                                                callAdvanceWinnerApi(match);
+                                            }
                                         };
                                     };
 
@@ -338,13 +366,23 @@ export default function TournamentBracket({
                                             )}
 
                                             {editable && hasWinner && !isEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditingId(match.id)}
-                                                    className="w-full py-1.5 text-[11px] font-semibold text-purple-300 hover:bg-purple-950/40 border-t border-gray-800/80 transition cursor-pointer"
-                                                >
-                                                    Editar resultado
-                                                </button>
+                                                <div className="border-t border-gray-800/80">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => callAdvanceWinnerApi(match)}
+                                                        disabled={busy}
+                                                        className="w-full py-1.5 text-[11px] font-semibold text-purple-300 hover:bg-purple-950/40 transition cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        Avanzar ganador (RF-28)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingId(match.id)}
+                                                        className="w-full py-1.5 text-[11px] font-semibold text-gray-300 hover:bg-gray-800/40 border-t border-gray-800/80 transition cursor-pointer"
+                                                    >
+                                                        Editar resultado
+                                                    </button>
+                                                </div>
                                             )}
 
                                             {editable && hasWinner && isEditing && (
@@ -354,6 +392,30 @@ export default function TournamentBracket({
                                                     onClose={() => setEditingId(null)}
                                                     onSubmit={(a, b, winner) => setResult(match, a, b, winner)}
                                                 />
+                                            )}
+
+                                            {/* Mostrar nombres de equipo si están definidos */}
+                                            {match.playerA?.TeamName && (
+                                                <p className="text-[10px] text-center text-purple-400 py-1">
+                                                    {match.playerA.TeamName}
+                                                </p>
+                                            )}
+                                            {match.playerB?.TeamName && (
+                                                <p className="text-[10px] text-center text-purple-400 py-1">
+                                                    {match.playerB.TeamName}
+                                                </p>
+                                            )}
+
+                                            {match.isBye && (
+                                                <p className="text-[10px] text-center text-gray-500 py-1 border-t border-gray-800/80">
+                                                    Pasa directo a la siguiente ronda
+                                                </p>
+                                            )}
+
+                                            {match.isWalkover && (
+                                                <p className="text-[10px] text-center text-red-400/80 py-1 border-t border-gray-800/80">
+                                                    Gana por descalificación del rival
+                                                </p>
                                             )}
                                         </div>
                                     );

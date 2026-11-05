@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
@@ -9,10 +9,13 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Estados de control para editar perfil (estadísticas y avatar)
+  // Estados de control para editar perfil (username, email y avatar)
   const [isEditing, setIsEditing] = useState(false);
-  const [statsForm, setStatsForm] = useState({ wins: 0, losses: 0, draws: 0 });
-  const [avatarUrlInput, setAvatarUrlInput] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    username: '',
+    email: '',
+    avatarUrl: ''
+  });
   const [submitting, setSubmitting] = useState(false);
 
   // Estados para gestionar Juegos (RF-06, RF-07, RF-08)
@@ -20,84 +23,79 @@ const ProfilePage = () => {
   const [gameForm, setGameForm] = useState({ gameName: 'League of Legends', inGameName: '', rank: '' });
   const [isEditingGame, setIsEditingGame] = useState(false);
 
-  const fetchProfileAndTeam = async () => {
-    try {
-      const profileResponse = await apiFetch('/profile/me');
-
-      if (profileResponse.status === 401) {
-        localStorage.removeItem('user');
-        navigate('/login');
-        return;
-      }
-
-      if (!profileResponse.ok) {
-        throw new Error('No se pudo cargar la información del perfil.');
-      }
-
-      const profileData = await profileResponse.json();
-      setProfile(profileData);
-
-      setStatsForm({
-        wins: profileData.stats?.wins || 0,
-        losses: profileData.stats?.losses || 0,
-        draws: profileData.stats?.draws || 0
-      });
-      setAvatarUrlInput(profileData.avatarUrl || '');
-
-      const teamsResponse = await apiFetch('/teams');
-
-      if (teamsResponse.ok) {
-        const teamsData = await teamsResponse.json();
-        const foundTeam = teamsData.find(team => 
-          team.members?.some(m => m.userId === profileData.id || m.UserId === profileData.id || m.username === profileData.username)
-        );
-        setUserTeam(foundTeam || null);
-      }
-
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchProfileAndTeam();
-  }, []);
+    const fetchProfileAndTeam = async () => {
+      try {
+        const profileResponse = await apiFetch('/profile/me');
 
-  // Actualizar Estadísticas y Avatar
+        if (profileResponse.status === 401) {
+          localStorage.removeItem('user');
+          navigate('/login');
+          return;
+        }
+
+        if (!profileResponse.ok) {
+          throw new Error('No se pudo cargar la información del perfil.');
+        }
+
+        const profileData = await profileResponse.json();
+        setProfile(profileData);
+
+        // Inicializar formulario con datos actuales
+        setProfileForm({
+          username: profileData.username,
+          email: profileData.email,
+          avatarUrl: profileData.avatarUrl || ''
+        });
+
+        const teamsResponse = await apiFetch('/teams');
+
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json();
+          const foundTeam = teamsData.find(team =>
+            team.members?.some(m => m.userId === profileData.id || m.UserId === profileData.id || m.username === profileData.username)
+          );
+          setUserTeam(foundTeam || null);
+        }
+
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileAndTeam();
+  }, [navigate]);
+
+  // Actualizar Perfil completo (username, email, avatar) usando PUT /profile/me
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const statsResponse = await apiFetch('/profile/stats', {
+      const response = await apiFetch('/profile/me', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          wins: Number(statsForm.wins),
-          losses: Number(statsForm.losses),
-          draws: Number(statsForm.draws)
+          username: profileForm.username.trim(),
+          email: profileForm.email.trim().toLowerCase(),
+          avatarUrl: profileForm.avatarUrl?.trim() || undefined
         })
       });
 
-      if (!statsResponse.ok) throw new Error('Error al actualizar las estadísticas.');
-      const statsData = await statsResponse.json();
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Error al actualizar el perfil.');
+      }
 
-      const avatarResponse = await apiFetch('/profile/avatar', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ AvatarUrl: avatarUrlInput })
+      const data = await response.json();
+      setProfile({
+        ...profile,
+        username: data.username,
+        email: data.email,
+        avatarUrl: data.avatarUrl || profile.avatarUrl
       });
-
-      if (!avatarResponse.ok) throw new Error('Error al actualizar el avatar.');
-      const avatarData = await avatarResponse.json();
-     
-      setProfile(prev => ({
-        ...prev,
-        stats: statsData.stats,
-        avatarUrl: avatarData.avatarUrl
-      }));
-     
+      
       setIsEditing(false);
       alert('¡Perfil actualizado con éxito!');
     } catch (err) {
@@ -106,6 +104,9 @@ const ProfilePage = () => {
       setSubmitting(false);
     }
   };
+
+  // Avatar temporal (preview) mientras se edita
+  
 
   // Guardar o Actualizar Videojuego (RF-06 y RF-07)
   const handleSaveGame = async (e) => {
@@ -211,49 +212,40 @@ const ProfilePage = () => {
       </header>
 
       {/* Panel de Edición Desplegable */}
-      {isEditing && (
+      {isEditing && ((
         <section className="bg-[#161b22] rounded-xl p-6 border border-purple-500/50 shadow-xl space-y-4">
           <h3 className="text-lg font-semibold text-white">Editar Información del Perfil</h3>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Ganadas (Wins)</label>
+                <label className="block text-xs text-gray-400 mb-1">Username (solo lectura, cambios reflejados en PUT /me)</label>
                 <input
-                  type="number" min="0"
-                  value={statsForm.wins}
-                  onChange={(e) => setStatsForm({ ...statsForm, wins: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  type="text"
+                  value={profileForm.username}
+                  onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                  disabled
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Perdidas (Losses)</label>
+                <label className="block text-xs text-gray-400 mb-1">Email (único, readonly en vista)</label>
                 <input
-                  type="number" min="0"
-                  value={statsForm.losses}
-                  onChange={(e) => setStatsForm({ ...statsForm, losses: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                  disabled
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Empatadas (Draws)</label>
+                <label className="block text-xs text-gray-400 mb-1">Nuevo Avatar (URL)</label>
                 <input
-                  type="number" min="0"
-                  value={statsForm.draws}
-                  onChange={(e) => setStatsForm({ ...statsForm, draws: e.target.value })}
+                  type="text"
+                  placeholder="https://images.unsplash.com/photo-..."
+                  value={profileForm.avatarUrl}
                   className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">URL de Foto de Perfil (Avatar)</label>
-              <input
-                type="text"
-                placeholder="https://images.unsplash.com/photo-..."
-                value={avatarUrlInput}
-                onChange={(e) => setAvatarUrlInput(e.target.value)}
-                className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
-              />
             </div>
 
             <button
@@ -264,7 +256,7 @@ const ProfilePage = () => {
             </button>
           </form>
         </section>
-      )}
+      ))}
 
       {/* Grid de Secciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

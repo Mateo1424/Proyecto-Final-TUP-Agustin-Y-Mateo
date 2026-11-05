@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { apiFetch } from '../../../config';
 import { Link } from 'react-router-dom';
 import { getStoredUser } from '../../../utils/Roles';
@@ -20,7 +20,6 @@ export default function Leaderboard() {
     const currentUser = getStoredUser();
 
     useEffect(() => {
-        setLoading(true);
         const query = selectedGame !== 'all' ? `?gameName=${encodeURIComponent(selectedGame)}` : '';
         
         apiFetch(`/rankings${query}`)
@@ -39,6 +38,13 @@ export default function Leaderboard() {
             });
     }, [selectedGame]);
 
+    // Solo recargamos (y mostramos el loader) cuando cambia el juego elegido
+    const handleSelectGame = (gameId) => {
+        if (gameId === selectedGame) return;
+        setLoading(true);
+        setSelectedGame(gameId);
+    };
+
     return (
         <div className="p-6 text-white max-w-5xl mx-auto min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -52,7 +58,7 @@ export default function Leaderboard() {
                     {AVAILABLE_GAMES.map(game => (
                         <button
                             key={game.id}
-                            onClick={() => setSelectedGame(game.id)}
+                            onClick={() => handleSelectGame(game.id)}
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
                                 selectedGame === game.id
                                     ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40'
