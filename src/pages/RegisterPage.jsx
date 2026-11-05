@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiFetch, GOOGLE_LOGIN_URL } from '../config';
+import { canonicalRankValue, getRankPickerSpec } from '../utils/teamRanks';
+
+const REGISTER_GAMES = ['Valorant', 'League of Legends', 'Counter-Strike 2', 'EA FC 27', 'Rocket League', 'CS:GO'];
 
 const RegisterPage = () => {
   const [username, setUsername] = useState('');
@@ -9,8 +12,11 @@ const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [game, setGame] = useState('Valorant');
   const [inGameName, setInGameName] = useState('');
+  const [rank, setRank] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  const rankSpec = useMemo(() => getRankPickerSpec(game), [game]);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -21,22 +27,29 @@ const RegisterPage = () => {
       return;
     }
 
+    const finalRank = canonicalRankValue(game, rankSpec, rank) || 'Sin clasificar';
+    if (rankSpec.kind === 'numeric' && rank) {
+      const n = parseInt(String(rank).replace(/[^\d]/g, ''), 10);
+      if (!Number.isFinite(n) || n < rankSpec.min) {
+        setError(`Indicá al menos ${rankSpec.min} puntos Premier.`);
+        return;
+      }
+    }
+
     try {
       const response = await apiFetch('/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          username, 
-          email, 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          email,
           password,
-          confirmPassword: confirmPassword, 
+          confirmPassword,
           games: [
             {
               gameName: game,
-              inGameName: inGameName, 
-              rank: 'Unranked'
+              inGameName,
+              rank: finalRank
             }
           ]
         }),
@@ -60,17 +73,32 @@ const RegisterPage = () => {
       localStorage.removeItem('token'); // limpieza del esquema anterior
 
       navigate('/dashboard');
-      
+
     } catch (err) {
       setError(err.message || 'Error al conectar con el servidor.');
     }
   };
 
+  const renderRankInput = () => {
+    const cls = "w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition";
+    if (rankSpec.kind === 'numeric') {
+      return <input type="number" min={rankSpec.min} step={rankSpec.step} value={rank} onChange={(e) => setRank(e.target.value)} placeholder={rankSpec.placeholder} className={cls} />;
+    }
+    if (rankSpec.kind === 'tiered' || rankSpec.kind === 'select') {
+      return (
+        <select value={rank} onChange={(e) => setRank(e.target.value)} className={cls}>
+          <option value="">Sin clasificar</option>
+          {rankSpec.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+    return <input type="text" value={rank} onChange={(e) => setRank(e.target.value)} placeholder={rankSpec.placeholder || 'Tu rango'} className={cls} />;
+  };
+
   return (
     <div className="min-h-screen bg-[#0d1117] text-white flex items-center justify-center p-4">
       <div className="bg-[#161b22] border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-xl">
-        
-        {/* Cabecera */}
+
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black text-purple-400 tracking-wider">NEXUS ARENA</h1>
           <p className="text-gray-400 text-sm mt-2">Crea tu perfil y comienza a competir</p>
@@ -82,12 +110,11 @@ const RegisterPage = () => {
           </div>
         )}
 
-        {/* Formulario */}
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Nombre de usuario</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="KaizenMX"
@@ -98,8 +125,8 @@ const RegisterPage = () => {
 
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Correo Electrónico</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@correo.com"
@@ -110,22 +137,19 @@ const RegisterPage = () => {
 
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Juego Principal</label>
-            <select 
+            <select
               value={game}
-              onChange={(e) => setGame(e.target.value)}
+              onChange={(e) => { setGame(e.target.value); setRank(''); }}
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
             >
-              <option value="Valorant">Valorant</option>
-              <option value="Counter-Strike 2">Counter-Strike 2</option>
-              <option value="League of Legends">League of Legends</option>
-              <option value="FC 25">FC 25</option>
+              {REGISTER_GAMES.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">ID / Nombre en el Juego</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={inGameName}
               onChange={(e) => setInGameName(e.target.value)}
               placeholder="Ej: Player#1234"
@@ -135,9 +159,15 @@ const RegisterPage = () => {
           </div>
 
           <div>
+            <label className="block text-xs font-medium text-gray-300 uppercase mb-1">{rankSpec.label}</label>
+            {renderRankInput()}
+            <p className="text-[11px] text-gray-500 mt-1">{rankSpec.help} Podés dejarlo como “Sin clasificar” y editarlo después en tu perfil.</p>
+          </div>
+
+          <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Contraseña</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -148,8 +178,8 @@ const RegisterPage = () => {
 
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Confirmar Contraseña</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
@@ -158,7 +188,7 @@ const RegisterPage = () => {
             />
           </div>
 
-          <button 
+          <button
             type="submit"
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition text-sm mt-2 shadow-lg shadow-purple-900/20"
           >
@@ -181,7 +211,6 @@ const RegisterPage = () => {
           Registrarse con Google
         </button>
 
-        {/* Enlace para ir al login */}
         <div className="text-center mt-6 text-sm text-gray-400">
           ¿Ya tienes una cuenta?{' '}
           <Link to="/login" className="text-purple-400 hover:underline font-medium">

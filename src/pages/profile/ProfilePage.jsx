@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
+import { canonicalRankValue, ensureOptionValue, getRankPickerSpec, parseRankValueForForm } from '../../utils/teamRanks';
+
+const PROFILE_GAME_OPTIONS = ['Valorant', 'League of Legends', 'Counter-Strike 2', 'EA FC 27', 'Rocket League', 'CS:GO'];
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -111,12 +114,19 @@ const ProfilePage = () => {
   // Guardar o Actualizar Videojuego (RF-06 y RF-07)
   const handleSaveGame = async (e) => {
     e.preventDefault();
+    const spec = getRankPickerSpec(gameForm.gameName);
+    const rank = canonicalRankValue(gameForm.gameName, spec, gameForm.rank);
+    if (!rank) { alert('Seleccioná tu rango.'); return; }
+    if (spec.kind === 'numeric') {
+      const n = parseInt(String(gameForm.rank).replace(/[^\d]/g, ''), 10);
+      if (!Number.isFinite(n) || n < spec.min) { alert(`Indicá al menos ${spec.min} puntos.`); return; }
+    }
     try {
       const method = isEditingGame ? 'PUT' : 'POST';
       const response = await apiFetch('/profile/games', {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(gameForm)
+        body: JSON.stringify({ gameName: gameForm.gameName, inGameName: gameForm.inGameName, rank })
       });
 
       const data = await response.json();
@@ -124,7 +134,7 @@ const ProfilePage = () => {
 
       setProfile(prev => ({ ...prev, games: data.games }));
       setShowGameModal(false);
-      setGameForm({ gameName: 'League of Legends', inGameName: '', rank: '' });
+      setGameForm({ gameName: 'Valorant', inGameName: '', rank: '' });
       setIsEditingGame(false);
       alert(data.message);
     } catch (err) {
@@ -153,9 +163,34 @@ const ProfilePage = () => {
 
   // Abrir modal para editar juego existente
   const openEditGame = (game) => {
-    setGameForm({ gameName: game.gameName, inGameName: game.inGameName, rank: game.rank });
+    const spec = getRankPickerSpec(game.gameName);
+    const stored = game.rank || '';
+    const formRank = spec.kind === 'tiered' || spec.kind === 'select'
+      ? ensureOptionValue(spec, stored)
+      : parseRankValueForForm(game.gameName, spec, stored);
+    setGameForm({ gameName: game.gameName, inGameName: game.inGameName || '', rank: formRank });
     setIsEditingGame(true);
     setShowGameModal(true);
+  };
+
+  const gameRankSpec = getRankPickerSpec(gameForm.gameName);
+  const renderGameRankInput = () => {
+    const cls = "w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500";
+    if (gameRankSpec.kind === 'numeric') {
+      return <input type="number" min={gameRankSpec.min} step={gameRankSpec.step} required placeholder={gameRankSpec.placeholder} value={gameForm.rank} onChange={(e) => setGameForm({ ...gameForm, rank: e.target.value })} className={cls} />;
+    }
+    if (gameRankSpec.kind === 'tiered' || gameRankSpec.kind === 'select') {
+      const hasCurrent = gameForm.rank && !gameRankSpec.options.includes(gameForm.rank) && gameForm.rank !== 'Sin clasificar';
+      return (
+        <select required value={gameForm.rank} onChange={(e) => setGameForm({ ...gameForm, rank: e.target.value })} className={cls}>
+          <option value="">Seleccionar rango...</option>
+          <option value="Sin clasificar">Sin clasificar</option>
+          {hasCurrent && <option value={gameForm.rank}>{gameForm.rank} (actual)</option>}
+          {gameRankSpec.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+    return <input type="text" required placeholder={gameRankSpec.placeholder || 'Ej: Diamante II'} value={gameForm.rank} onChange={(e) => setGameForm({ ...gameForm, rank: e.target.value })} className={cls} />;
   };
 
   if (loading) return <div className="p-8 text-white">Cargando perfil...</div>;
@@ -267,7 +302,7 @@ const ProfilePage = () => {
             <h3 className="text-lg font-semibold text-white">Videojuegos Asociados</h3>
             <button
               onClick={() => {
-                setGameForm({ gameName: 'League of Legends', inGameName: '', rank: '' });
+                setGameForm({ gameName: 'Valorant', inGameName: '', rank: '' });
                 setIsEditingGame(false);
                 setShowGameModal(true);
               }}
@@ -368,13 +403,10 @@ const ProfilePage = () => {
                 <select
                   disabled={isEditingGame}
                   value={gameForm.gameName}
-                  onChange={(e) => setGameForm({ ...gameForm, gameName: e.target.value })}
+                  onChange={(e) => setGameForm({ ...gameForm, gameName: e.target.value, rank: '' })}
                   className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
                 >
-                  <option value="League of Legends">League of Legends</option>
-                  <option value="Valorant">Valorant</option>
-                  <option value="CS:GO">CS:GO</option>
-                  <option value="Rocket League">Rocket League</option>
+                  {PROFILE_GAME_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
 
@@ -391,15 +423,9 @@ const ProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Rango o Nivel</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Diamante II / Immortal"
-                  value={gameForm.rank}
-                  onChange={(e) => setGameForm({ ...gameForm, rank: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                />
+                <label className="block text-xs text-gray-400 mb-1">{gameRankSpec.label}</label>
+                {renderGameRankInput()}
+                <p className="text-[11px] text-gray-500 mt-1">{gameRankSpec.help}</p>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
