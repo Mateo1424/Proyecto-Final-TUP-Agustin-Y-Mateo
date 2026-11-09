@@ -247,37 +247,40 @@ const ProfilePage = () => {
       </header>
 
       {/* Panel de Edición Desplegable */}
-      {isEditing && ((
+      {isEditing && (
         <section className="bg-[#161b22] rounded-xl p-6 border border-purple-500/50 shadow-xl space-y-4">
           <h3 className="text-lg font-semibold text-white">Editar Información del Perfil</h3>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Username (solo lectura, cambios reflejados en PUT /me)</label>
+                <label className="block text-xs text-gray-400 mb-1">Nombre de usuario</label>
                 <input
                   type="text"
+                  minLength={3}
+                  maxLength={30}
                   value={profileForm.username}
                   onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
-                  disabled
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Email (único, readonly en vista)</label>
+                <label className="block text-xs text-gray-400 mb-1">Email</label>
                 <input
                   type="email"
                   value={profileForm.email}
                   onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50"
-                  disabled
+                  className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Nuevo Avatar (URL)</label>
+                <label className="block text-xs text-gray-400 mb-1">Avatar (URL)</label>
                 <input
                   type="text"
-                  placeholder="https://images.unsplash.com/photo-..."
+                  placeholder="https://..."
                   value={profileForm.avatarUrl}
+                  onChange={(e) => setProfileForm({ ...profileForm, avatarUrl: e.target.value })}
                   className="w-full bg-[#0d1117] border border-gray-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
                 />
               </div>
@@ -291,7 +294,7 @@ const ProfilePage = () => {
             </button>
           </form>
         </section>
-      ))}
+      )}
 
       {/* Grid de Secciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

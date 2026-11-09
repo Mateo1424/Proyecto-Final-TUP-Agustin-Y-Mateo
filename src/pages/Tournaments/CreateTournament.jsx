@@ -23,6 +23,16 @@ const AVAILABLE_GAMES = [
     id: 'eafc27', 
     name: 'EA FC 27', 
     logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTzVePMddak4LGngyCU9nWoLCdopSHPgZvCP7g1ogvB5Q&s=10' 
+  },
+  { 
+    id: 'rocketleague', 
+    name: 'Rocket League', 
+    logo: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1000&auto=format&fit=crop' 
+  },
+  { 
+    id: 'csgo', 
+    name: 'CS:GO', 
+    logo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop' 
   }
 ];
 

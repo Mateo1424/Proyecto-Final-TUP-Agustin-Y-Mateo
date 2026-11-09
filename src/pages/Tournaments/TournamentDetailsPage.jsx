@@ -282,7 +282,7 @@ export default function TournamentDetailPage() {
                   <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                     <input className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" value={editForm.title} onChange={e=>setEditForm({...editForm,title:e.target.value})} placeholder="Título" />
                     <select className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" style={{colorScheme:'dark'}} value={editForm.gameName} onChange={e=>setEditForm({...editForm,gameName:e.target.value})}>
-                      {['Valorant','Counter-Strike 2','League of Legends','EA FC 27'].map(g=> <option key={g} value={g}>{g}</option>)}
+                      {['Valorant','Counter-Strike 2','League of Legends','EA FC 27','Rocket League','CS:GO'].map(g=> <option key={g} value={g}>{g}</option>)}
                     </select>
                     <select className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" style={{colorScheme:'dark'}} value={editForm.tournamentType} onChange={e=>setEditForm({...editForm,tournamentType:e.target.value})}>
                       <option value="Individual">Individual</option>

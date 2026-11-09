@@ -4,7 +4,7 @@ import { apiFetch } from '../../config';
 import { getStoredUser, isModerator } from '../../utils/Roles';
 
 const STATUS_OPTIONS = ['', 'Próximo', 'En curso', 'Finalizado', 'Cancelado'];
-const GAME_OPTIONS = ['', 'Valorant', 'Counter-Strike 2', 'League of Legends', 'EA FC 27'];
+const GAME_OPTIONS = ['', 'Valorant', 'Counter-Strike 2', 'League of Legends', 'EA FC 27', 'Rocket League', 'CS:GO'];
 
 export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);

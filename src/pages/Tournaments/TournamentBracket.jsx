@@ -244,9 +244,9 @@ export default function TournamentBracket({
     };
 
     const callAdvanceWinnerApi = async (match) => {
-        const confirmed = window.confirm(
-            `¿Confirmás avanzar al ganador "${match.winnerUserId ? '...' : 'pendiente'}" a la siguiente ronda?`
-        );
+        const winner = [match.playerA, match.playerB].find(p => p?.userId === match.winnerUserId);
+        const name = winner?.username || winner?.teamName || 'seleccionado';
+        const confirmed = window.confirm(`¿Confirmás avanzar a ${name} a la siguiente ronda?`);
         if (!confirmed) return;
         await callApi(`/tournaments/${match.tournamentId}/matches/${match.id}/advance`, {
             method: 'POST'
@@ -395,26 +395,14 @@ export default function TournamentBracket({
                                             )}
 
                                             {/* Mostrar nombres de equipo si están definidos */}
-                                            {match.playerA?.TeamName && (
+                                            {match.playerA?.teamName && (
                                                 <p className="text-[10px] text-center text-purple-400 py-1">
-                                                    {match.playerA.TeamName}
+                                                    {match.playerA.teamName}
                                                 </p>
                                             )}
-                                            {match.playerB?.TeamName && (
+                                            {match.playerB?.teamName && (
                                                 <p className="text-[10px] text-center text-purple-400 py-1">
-                                                    {match.playerB.TeamName}
-                                                </p>
-                                            )}
-
-                                            {match.isBye && (
-                                                <p className="text-[10px] text-center text-gray-500 py-1 border-t border-gray-800/80">
-                                                    Pasa directo a la siguiente ronda
-                                                </p>
-                                            )}
-
-                                            {match.isWalkover && (
-                                                <p className="text-[10px] text-center text-red-400/80 py-1 border-t border-gray-800/80">
-                                                    Gana por descalificación del rival
+                                                    {match.playerB.teamName}
                                                 </p>
                                             )}
                                         </div>
