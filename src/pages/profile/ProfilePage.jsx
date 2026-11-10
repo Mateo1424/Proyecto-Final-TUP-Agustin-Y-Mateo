@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { canonicalRankValue, ensureOptionValue, getRankPickerSpec, parseRankValueForForm } from '../../utils/teamRanks';
 
 const PROFILE_GAME_OPTIONS = ['Valorant', 'League of Legends', 'Counter-Strike 2', 'EA FC 27', 'Rocket League', 'CS:GO'];
+
+// Mantiene localStorage.user alineado con los videojuegos del perfil.
+const syncLocalUserGames = (games) => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('user') || '{}');
+    localStorage.setItem('user', JSON.stringify({ ...stored, games: games || [] }));
+  } catch {
+    // localStorage corrupto: se regenera al recargar la sesión.
+  }
+};
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -98,7 +108,21 @@ const ProfilePage = () => {
         email: data.email,
         avatarUrl: data.avatarUrl || profile.avatarUrl
       });
-      
+
+      // Sincroniza la sesión local para que el resto de la app use el username actualizado.
+      try {
+        const stored = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({
+          ...stored,
+          username: data.username,
+          email: data.email,
+          avatarUrl: data.avatarUrl || stored.avatarUrl || null
+        }));
+        localStorage.setItem('username', data.username);
+      } catch {
+        // Si localStorage está corrupto, no bloqueamos la actualización del perfil.
+      }
+
       setIsEditing(false);
       alert('¡Perfil actualizado con éxito!');
     } catch (err) {
@@ -133,6 +157,7 @@ const ProfilePage = () => {
       if (!response.ok) throw new Error(data.message || 'Error al guardar el videojuego.');
 
       setProfile(prev => ({ ...prev, games: data.games }));
+      syncLocalUserGames(data.games);
       setShowGameModal(false);
       setGameForm({ gameName: 'Valorant', inGameName: '', rank: '' });
       setIsEditingGame(false);
@@ -155,6 +180,7 @@ const ProfilePage = () => {
       if (!response.ok) throw new Error(data.message || 'Error al eliminar el videojuego.');
 
       setProfile(prev => ({ ...prev, games: data.games }));
+      syncLocalUserGames(data.games);
       alert('Videojuego eliminado con éxito.');
     } catch (err) {
       alert(err.message);

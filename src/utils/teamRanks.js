@@ -92,3 +92,65 @@ export function ensureOptionValue(spec, value) {
   const found = spec.options.find(o => o.toLowerCase() === norm);
   return found || value;
 }
+
+// ----- Condiciones de rango de torneos (RF-20 / RF-22) -----
+// Formato canónico que entiende el backend:
+//   "Sin restricción" | "Mínimo: Oro 2" | "Fijo: Premier 15000"
+export function buildRankCondition(mode, rank) {
+  if (!mode || mode === 'none') return 'Sin restricción';
+  const prefix = mode === 'fixed' ? 'Fijo' : 'Mínimo';
+  const value = String(rank ?? '').trim();
+  // Si falta el rango queda "Mínimo:" / "Fijo:" para que el backend lo rechace
+  // y el formulario pueda pedir el rango antes de guardar.
+  return value ? `${prefix}: ${value}` : `${prefix}:`;
+}
+
+export function isIncompleteRankCondition(condition) {
+  return /^(m[ií]nimo|min|fijo|exacto)\s*:\s*$/i.test(String(condition ?? '').trim());
+}
+
+export function parseRankCondition(gameName, condition) {
+  const raw = String(condition ?? '').trim();
+  const lower = raw.toLowerCase();
+
+  if (!raw || lower === '-' || lower === 'n/a'
+    || lower.includes('sin restric') || lower.includes('libre') || lower.includes('todos')
+    || lower.includes('cualquiera') || lower.includes('abierto') || lower.includes('ningun')) {
+    return { mode: 'none', rank: '', legacy: false, raw };
+  }
+
+  const fixedIntent = lower.startsWith('fijo') || lower.startsWith('exacto')
+    || lower.includes('rango fijo') || lower.includes('rango exacto');
+  const minIntent = lower.startsWith('mínimo') || lower.startsWith('minimo') || lower.startsWith('min:')
+    || lower.includes('mínimo') || lower.includes('minimo') || lower.includes('al menos')
+    || lower.includes('desde') || lower.includes('o más') || lower.includes('o mas')
+    || lower.includes('o superior') || lower.includes('superior') || lower.includes('>=')
+    || raw.endsWith('+');
+
+  if (!fixedIntent && !minIntent) {
+    return { mode: 'none', rank: '', legacy: true, raw };
+  }
+
+  let candidate = raw
+    .replace(/^(condici[oó]n(es)?\s*(de\s*rango)?\s*[:-]\s*)/i, '')
+    .replace(/\b(rango\s*m[ií]nimo|m[ií]nimo|minimum|min|rango\s*fijo|fijo|exacto|solo|rango|al\s*menos|desde|o\s*superior|o\s*m[aá]s)\b\s*[:-]?/gi, '')
+    .replace(/>=|>/g, '')
+    .replace(/\s*(o\s+superior|o\s+m[aá]s|en\s+adelante).*$/i, '')
+    .trim()
+    .replace(/\+$/, '')
+    .trim();
+
+  // Los juegos con puntos (CS2/CS:GO Premier) usan solo el número en el selector.
+  const spec = getRankPickerSpec(gameName);
+  if (spec.kind === 'numeric') {
+    const m = candidate.match(/(\d+)/);
+    candidate = m ? m[1] : '';
+  }
+
+  return {
+    mode: fixedIntent && !minIntent ? 'fixed' : 'minimum',
+    rank: candidate,
+    legacy: false,
+    raw
+  };
+}

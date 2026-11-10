@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { getStoredUser, isModerator } from '../../utils/Roles';
+import { getRankPickerSpec } from '../../utils/teamRanks';
 
 const STATUS_OPTIONS = ['', 'Próximo', 'En curso', 'Finalizado', 'Cancelado'];
 const GAME_OPTIONS = ['', 'Valorant', 'Counter-Strike 2', 'League of Legends', 'EA FC 27', 'Rocket League', 'CS:GO'];
@@ -10,10 +11,11 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({ gameName: '', status: '', fromDate: '', toDate: '' });
+  const [filters, setFilters] = useState({ gameName: '', status: '', fromDate: '', toDate: '', rank: '' });
   const navigate = useNavigate();
 
   const canCreate = isModerator(getStoredUser());
+  const rankSpec = getRankPickerSpec(filters.gameName);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -23,6 +25,7 @@ export default function TournamentsPage() {
     if (filters.status) params.set('status', filters.status);
     if (filters.fromDate) params.set('fromDate', new Date(filters.fromDate).toISOString());
     if (filters.toDate) params.set('toDate', new Date(filters.toDate).toISOString());
+    if (filters.rank.trim()) params.set('rank', filters.rank.trim());
     const qs = params.toString();
 
     apiFetch(`/tournaments${qs ? `?${qs}` : ''}`)
@@ -40,6 +43,8 @@ export default function TournamentsPage() {
       });
   }, [filters]);
 
+  // Carga inicial / recarga cuando cambian los filtros (RF-19).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const statusBadge = (status) => {
@@ -64,8 +69,8 @@ export default function TournamentsPage() {
       </div>
 
       {/* RF-19: filtros */}
-      <div className="bg-[#161b22] border border-gray-800 rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <select value={filters.gameName} onChange={e=>setFilters(f=>({...f, gameName:e.target.value}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm">
+      <div className="bg-[#161b22] border border-gray-800 rounded-xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <select value={filters.gameName} onChange={e=>setFilters(f=>({...f, gameName:e.target.value, rank:''}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm">
           {GAME_OPTIONS.map(g => <option key={g||'all'} value={g}>{g || 'Todos los juegos'}</option>)}
         </select>
         <select value={filters.status} onChange={e=>setFilters(f=>({...f, status:e.target.value}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm">
@@ -73,8 +78,31 @@ export default function TournamentsPage() {
         </select>
         <input type="date" value={filters.fromDate} onChange={e=>setFilters(f=>({...f, fromDate:e.target.value}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm" title="Desde" />
         <input type="date" value={filters.toDate} onChange={e=>setFilters(f=>({...f, toDate:e.target.value}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm" title="Hasta" />
-        <button onClick={()=>setFilters({gameName:'',status:'',fromDate:'',toDate:''})} className="p-2 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-800">Limpiar filtros</button>
+        {filters.gameName && (rankSpec.kind === 'tiered' || rankSpec.kind === 'select') ? (
+          <select value={filters.rank} onChange={e=>setFilters(f=>({...f, rank:e.target.value}))} style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm" title="Mi rango">
+            <option value="">Cualquier rango</option>
+            {rankSpec.options.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        ) : (
+          <input
+            type={filters.gameName && rankSpec.kind === 'numeric' ? 'number' : 'text'}
+            min={rankSpec.kind === 'numeric' ? rankSpec.min : undefined}
+            step={rankSpec.kind === 'numeric' ? rankSpec.step : undefined}
+            value={filters.rank}
+            onChange={e=>setFilters(f=>({...f, rank:e.target.value}))}
+            placeholder={filters.gameName ? (rankSpec.placeholder || 'Mi rango') : 'Mi rango (elegí juego)'}
+            className="p-2 bg-[#0d1117] border border-gray-800 rounded-lg text-sm"
+            title="Muestra torneos compatibles con tu rango"
+          />
+        )}
+        <button onClick={()=>setFilters({gameName:'',status:'',fromDate:'',toDate:'',rank:''})} className="p-2 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-800">Limpiar filtros</button>
       </div>
+
+      {filters.rank && (
+        <p className="text-xs text-gray-500 -mt-3 mb-4">
+          Mostrando torneos sin restricción o compatibles con <span className="text-purple-300 font-medium">{filters.rank}</span>. Las condiciones en texto libre se incluyen para verificación manual (RF-22).
+        </p>
+      )}
 
       {loading ? (
         <div className="text-center text-gray-300">Cargando torneos...</div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { isModerator as checkModerator } from '../../utils/Roles';
@@ -95,6 +95,8 @@ export default function TeamDetailPage() {
     }
   }, [id]);
 
+  // Carga inicial / recarga del detalle del equipo.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchTeam(); }, [fetchTeam]);
 
   const handleJoin = async () => {

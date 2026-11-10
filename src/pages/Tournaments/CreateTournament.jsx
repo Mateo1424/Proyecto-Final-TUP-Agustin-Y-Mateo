@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
+import RankConditionBuilder from '../../components/RankConditionBuilder';
+import { isIncompleteRankCondition } from '../../utils/teamRanks';
 
 // Portadas oficiales garantizadas con enlaces estables
 const AVAILABLE_GAMES = [
@@ -66,7 +68,7 @@ export default function CreateTournament() {
     maxParticipants: 16,
     rules: '',
     bannerUrl: '',
-    rankConditions: ''
+    rankConditions: 'Sin restricción'
   });
 
   const handleChange = (e) => {
@@ -74,7 +76,8 @@ export default function CreateTournament() {
   };
 
   const handleGameSelect = (gameName) => {
-    setFormData({ ...formData, gameName });
+    // Al cambiar de juego, la condición anterior puede no existir en la nueva escalera.
+    setFormData({ ...formData, gameName, rankConditions: 'Sin restricción' });
   };
 
   // Atajo para pruebas: inicio dentro de N minutos y fin una hora después
@@ -106,6 +109,11 @@ export default function CreateTournament() {
     const maxParticipants = Number(formData.maxParticipants);
     if (!Number.isInteger(maxParticipants) || maxParticipants < 2) {
       alert('El torneo necesita al menos 2 participantes.');
+      return;
+    }
+
+    if (isIncompleteRankCondition(formData.rankConditions)) {
+      alert('Elegí el rango de la restricción o seleccioná "Sin restricción".');
       return;
     }
 
@@ -291,7 +299,11 @@ export default function CreateTournament() {
 
         <div>
           <label className="block text-sm font-semibold mb-1">Condiciones de Rango</label>
-          <input name="rankConditions" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Libre para todos los rangos / Solo Diamante+" required />
+          <RankConditionBuilder
+            gameName={formData.gameName}
+            value={formData.rankConditions}
+            onChange={(value) => setFormData((prev) => ({ ...prev, rankConditions: value }))}
+          />
         </div>
 
         <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40 cursor-pointer">

@@ -43,6 +43,8 @@ export default function TeamsPage() {
     }
   }, [userId]);
 
+  // Carga inicial / recarga de equipos e invitaciones.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const respond = async (invitationId, response) => {
