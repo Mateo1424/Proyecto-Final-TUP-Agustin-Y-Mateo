@@ -5,6 +5,22 @@ import { canonicalRankValue, ensureOptionValue, getRankPickerSpec, parseRankValu
 
 const PROFILE_GAME_OPTIONS = ['Valorant', 'League of Legends', 'Counter-Strike 2', 'EA FC 27', 'Rocket League', 'CS:GO'];
 
+const TX_LABELS = {
+  Participation: 'Participación',
+  MatchWin: 'Victoria',
+  MatchLoss: 'Derrota',
+  Champion: 'Campeón',
+  RunnerUp: 'Subcampeón',
+  Semifinalist: 'Semifinalista'
+};
+
+const formatTxDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 // Mantiene localStorage.user alineado con los videojuegos del perfil.
 const syncLocalUserGames = (games) => {
   try {
@@ -19,6 +35,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [userTeam, setUserTeam] = useState(null);
+  const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -35,6 +52,17 @@ const ProfilePage = () => {
   const [showGameModal, setShowGameModal] = useState(false);
   const [gameForm, setGameForm] = useState({ gameName: 'League of Legends', inGameName: '', rank: '' });
   const [isEditingGame, setIsEditingGame] = useState(false);
+
+  // Puntos del ranking propio de la web (RF-31 / RF-40).
+  const refreshProgress = async () => {
+    try {
+      const response = await apiFetch('/rankings/me');
+      if (!response.ok) return;
+      setProgress(await response.json());
+    } catch {
+      // El perfil sigue funcionando aunque el ranking no esté disponible.
+    }
+  };
 
   useEffect(() => {
     const fetchProfileAndTeam = async () => {
@@ -69,6 +97,12 @@ const ProfilePage = () => {
             team.members?.some(m => m.userId === profileData.id || m.UserId === profileData.id || m.username === profileData.username)
           );
           setUserTeam(foundTeam || null);
+        }
+
+        // Ranking web: progreso e historial desde que el jugador empezó en la plataforma.
+        const rankingResponse = await apiFetch('/rankings/me');
+        if (rankingResponse.ok) {
+          setProgress(await rankingResponse.json());
         }
 
       } catch (err) {
@@ -158,6 +192,7 @@ const ProfilePage = () => {
 
       setProfile(prev => ({ ...prev, games: data.games }));
       syncLocalUserGames(data.games);
+      await refreshProgress();
       setShowGameModal(false);
       setGameForm({ gameName: 'Valorant', inGameName: '', rank: '' });
       setIsEditingGame(false);
@@ -181,6 +216,7 @@ const ProfilePage = () => {
 
       setProfile(prev => ({ ...prev, games: data.games }));
       syncLocalUserGames(data.games);
+      await refreshProgress();
       alert('Videojuego eliminado con éxito.');
     } catch (err) {
       alert(err.message);
@@ -253,6 +289,10 @@ const ProfilePage = () => {
 
         <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto justify-between">
           <div className="flex gap-4 border-t md:border-t-0 md:border-l border-gray-800 pt-4 md:pt-0 md:pl-6">
+            <div className="text-center">
+              <span className="block text-2xl font-bold text-purple-400">{progress?.totalPoints ?? 0}</span>
+              <span className="text-xs text-gray-400 uppercase tracking-wider">Puntos web</span>
+            </div>
             <div className="text-center">
               <span className="block text-2xl font-bold text-purple-400">{profile?.stats?.matchesPlayed || 0}</span>
               <span className="text-xs text-gray-400 uppercase tracking-wider">Partidas</span>
@@ -348,7 +388,12 @@ const ProfilePage = () => {
                   <div>
                     <h4 className="font-medium text-white text-sm">{game.gameName}</h4>
                     <p className="text-xs text-purple-400 mt-0.5">
-                      In-Game: <span className="text-gray-200 font-medium">{game.inGameName || 'N/A'}</span> | Rango: <span className="text-emerald-400 font-medium">{game.rank || 'Unranked'}</span>
+                      In-Game: <span className="text-gray-200 font-medium">{game.inGameName || 'N/A'}</span> | Rango in-game: <span className="text-emerald-400 font-medium">{game.rank || 'Unranked'}</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Puntos web: <span className="text-purple-300 font-mono font-bold">{game.points ?? 0}</span>
+                      <span className="text-gray-600"> · </span>
+                      Torneos: <span className="text-gray-200">{game.tournamentsPlayed ?? 0}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -418,6 +463,66 @@ const ProfilePage = () => {
         </section>
 
       </div>
+
+      {/* Sección: progreso en el ranking propio de la web (RF-31 / RF-40) */}
+      <section className="bg-[#161b22] rounded-xl p-6 border border-purple-900/30 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Mi progreso en la plataforma</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Empezaste en 0 puntos al vincular cada juego. Solo suma por torneos jugados en la web;
+              el rango in-game es solo una referencia.
+            </p>
+          </div>
+          <Link to="/rankings" className="text-xs font-semibold text-purple-400 hover:text-purple-300">
+            Ver ranking completo →
+          </Link>
+        </div>
+
+        {!progress?.games?.length ? (
+          <p className="text-xs text-gray-500">
+            Todavía no tenés historial de ranking. Participá en un torneo para empezar a sumar.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {progress.games.map(game => (
+              <div key={game.gameName} className="bg-[#0d1117] border border-gray-800/80 rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold text-white text-sm">{game.gameName}</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Rango in-game: <span className="text-emerald-400">{game.rank || '—'}</span>
+                      {game.position > 0 && (
+                        <span className="text-gray-500"> · Posición #{game.position}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-purple-400">{game.points}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">puntos web</p>
+                  </div>
+                </div>
+
+                {game.history?.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {game.history.map(tx => (
+                      <div key={tx.id} className="flex items-start justify-between gap-3 bg-black/30 border border-gray-800/70 rounded px-2.5 py-1.5">
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-200 truncate">{tx.tournamentTitle || 'Torneo'}</p>
+                          <p className="text-[10px] text-gray-500">
+                            {TX_LABELS[tx.type] || tx.type} · {formatTxDate(tx.createdAt)}
+                          </p>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">+{tx.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Modal para Vincular/Modificar Videojuego */}
       {showGameModal && (

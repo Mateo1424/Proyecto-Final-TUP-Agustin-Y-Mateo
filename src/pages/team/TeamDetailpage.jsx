@@ -34,6 +34,7 @@ export default function TeamDetailPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteUsername, setInviteUsername] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [roleUpdatingId, setRoleUpdatingId] = useState('');
 
   // Estados de edición para el capitán (RF-10)
   const [isEditingTeam, setIsEditingTeam] = useState(false);
@@ -218,16 +219,41 @@ export default function TeamDetailPage() {
 
   // RF-14 / RF-15
   const handleToggleStarter = async (member) => {
+    setRoleUpdatingId(member.userId);
     try {
       const response = await apiFetch(`/teams/${id}/members/${member.userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: member.role || 'Member', isStarter: !member.isStarter })
       });
-      if (!response.ok) throw new Error('Error al actualizar rol');
+      const data = await readBody(response);
+      if (!response.ok) throw new Error(data?.message || 'Error al actualizar rol');
       fetchTeam();
     } catch (err) {
       alert(err.message);
+    } finally {
+      setRoleUpdatingId('');
+    }
+  };
+
+  // RF-14: transferir la capitanía (el capitán anterior pasa a miembro).
+  const handleTransferCaptain = async (member) => {
+    if (!window.confirm(`¿Transferir la capitanía a ${member.username}? Vos pasarías a ser miembro del equipo.`)) return;
+    setRoleUpdatingId(member.userId);
+    try {
+      const response = await apiFetch(`/teams/${id}/members/${member.userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'Captain', isStarter: member.isStarter })
+      });
+      const data = await readBody(response);
+      if (!response.ok) throw new Error(data?.message || 'Error al transferir la capitanía');
+      await fetchTeam();
+      alert(`Ahora ${member.username} es el capitán del equipo.`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRoleUpdatingId('');
     }
   };
 
@@ -301,6 +327,13 @@ export default function TeamDetailPage() {
               <span className="bg-purple-600/20 text-purple-400 text-xs font-semibold px-3 py-1 rounded-full uppercase border border-purple-500/30 font-mono">[{team.tag}]</span>
               <h1 className="text-3xl font-extrabold mt-2 text-white">{team.name}</h1>
               <p className="text-gray-400 text-sm mt-1">{members.length} miembros{team.gameName ? ` · ${team.gameName}` : ''}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Puntos web: <span className="text-purple-300 font-mono font-bold">{team.points ?? 0}</span>
+                <span className="text-gray-600"> · </span>
+                Torneos ganados: <span className="text-amber-300 font-mono">{team.tournamentsWon ?? 0}</span>
+                <span className="text-gray-600"> / </span>
+                <span className="text-gray-200 font-mono">{team.tournamentsPlayed ?? 0}</span>
+              </p>
               <p className="text-xs mt-2">
                 <span className={`px-2 py-0.5 rounded border ${isOpenTeam ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-amber-950/40 text-amber-300 border-amber-800/50'}`}>
                   {policyLabel(team)}
@@ -446,11 +479,14 @@ export default function TeamDetailPage() {
 
                   <div className="flex items-center gap-3">
                     {isCaptain && !memberIsCaptain && (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleToggleStarter(m)} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-gray-300 transition">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button onClick={() => handleToggleStarter(m)} disabled={roleUpdatingId === m.userId} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-gray-300 transition disabled:opacity-50">
                           Cambiar a {m.isStarter ? 'Suplente' : 'Titular'}
                         </button>
-                        <button onClick={() => handleRemoveMember(m.userId, m.username)} className="text-xs bg-red-950 hover:bg-red-900 text-red-300 px-3 py-1.5 rounded border border-red-800/50 transition">
+                        <button onClick={() => handleTransferCaptain(m)} disabled={roleUpdatingId === m.userId} className="text-xs bg-purple-950 hover:bg-purple-900 text-purple-200 px-3 py-1.5 rounded border border-purple-800/60 transition disabled:opacity-50">
+                          {roleUpdatingId === m.userId ? 'Actualizando...' : 'Hacer capitán'}
+                        </button>
+                        <button onClick={() => handleRemoveMember(m.userId, m.username)} disabled={roleUpdatingId === m.userId} className="text-xs bg-red-950 hover:bg-red-900 text-red-300 px-3 py-1.5 rounded border border-red-800/50 transition disabled:opacity-50">
                           Expulsar
                         </button>
                       </div>

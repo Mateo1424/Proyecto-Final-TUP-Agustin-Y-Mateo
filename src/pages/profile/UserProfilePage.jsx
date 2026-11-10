@@ -2,11 +2,28 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../../config';
 
+const TX_LABELS = {
+  Participation: 'Participación',
+  MatchWin: 'Victoria',
+  MatchLoss: 'Derrota',
+  Champion: 'Campeón',
+  RunnerUp: 'Subcampeón',
+  Semifinalist: 'Semifinalista'
+};
+
+const formatTxDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 const UserProfilePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [userTeam, setUserTeam] = useState(null);
+  const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -48,6 +65,12 @@ const UserProfilePage = () => {
             team.members?.some(m => m.userId === data.id || m.UserId === data.id)
           );
           setUserTeam(foundTeam || null);
+        }
+
+        // Puntos web del jugador (RF-31 / RF-40).
+        const rankingResponse = await apiFetch(`/rankings/users/${data.id}`);
+        if (rankingResponse.ok) {
+          setProgress(await rankingResponse.json());
         }
       } catch (err) {
         setError(err.message);
@@ -118,6 +141,10 @@ const UserProfilePage = () => {
 
         <div className="flex gap-4 border-t md:border-t-0 md:border-l border-gray-800 pt-4 md:pt-0 md:pl-6">
           <div className="text-center">
+            <span className="block text-2xl font-bold text-purple-400">{progress?.totalPoints ?? 0}</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wider">Puntos web</span>
+          </div>
+          <div className="text-center">
             <span className="block text-2xl font-bold text-purple-400">{profile?.stats?.matchesPlayed || 0}</span>
             <span className="text-xs text-gray-400 uppercase tracking-wider">Partidas</span>
           </div>
@@ -140,7 +167,12 @@ const UserProfilePage = () => {
                 <div key={index} className="bg-[#0d1117] p-4 rounded-lg border border-gray-800/80 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-white text-sm">{game.gameName}</h4>
-                    <p className="text-xs text-purple-400 mt-0.5">In-Game: {game.inGameName || 'N/A'} • Rango: {game.rank || 'Unranked'}</p>
+                    <p className="text-xs text-purple-400 mt-0.5">In-Game: {game.inGameName || 'N/A'} • Rango in-game: {game.rank || 'Unranked'}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Puntos web: <span className="text-purple-300 font-mono font-bold">{game.points ?? 0}</span>
+                      <span className="text-gray-600"> · </span>
+                      Torneos: <span className="text-gray-200">{game.tournamentsPlayed ?? 0}</span>
+                    </p>
                   </div>
                 </div>
               ))
@@ -176,6 +208,63 @@ const UserProfilePage = () => {
           )}
         </section>
       </div>
+
+      {/* Progreso en el ranking propio de la web (RF-31 / RF-40) */}
+      <section className="bg-[#161b22] rounded-xl p-6 border border-purple-900/30 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Progreso en la plataforma</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Puntos ganados por torneos jugados en la web. El rango in-game se muestra solo como referencia.
+            </p>
+          </div>
+          <Link to="/rankings" className="text-xs font-semibold text-purple-400 hover:text-purple-300">
+            Ver ranking completo →
+          </Link>
+        </div>
+
+        {!progress?.games?.length ? (
+          <p className="text-xs text-gray-500">Este usuario todavía no tiene historial de ranking.</p>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {progress.games.map(game => (
+              <div key={game.gameName} className="bg-[#0d1117] border border-gray-800/80 rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold text-white text-sm">{game.gameName}</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Rango in-game: <span className="text-emerald-400">{game.rank || '—'}</span>
+                      {game.position > 0 && (
+                        <span className="text-gray-500"> · Posición #{game.position}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-purple-400">{game.points}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">puntos web</p>
+                  </div>
+                </div>
+
+                {game.history?.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {game.history.map(tx => (
+                      <div key={tx.id} className="flex items-start justify-between gap-3 bg-black/30 border border-gray-800/70 rounded px-2.5 py-1.5">
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-200 truncate">{tx.tournamentTitle || 'Torneo'}</p>
+                          <p className="text-[10px] text-gray-500">
+                            {TX_LABELS[tx.type] || tx.type} · {formatTxDate(tx.createdAt)}
+                          </p>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">+{tx.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };
