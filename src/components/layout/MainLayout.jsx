@@ -51,6 +51,9 @@ const MainLayout = () => {
             <NavLink to="/tournaments" className={navClass}>
               Torneos
             </NavLink>
+            <NavLink to="/rankings" className={navClass}>
+              Ranking
+            </NavLink>
           </nav>
         </div>
 

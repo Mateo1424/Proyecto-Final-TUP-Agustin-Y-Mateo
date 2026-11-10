@@ -19,6 +19,13 @@ const MODES = [
     { id: 'me', label: 'Mi progreso' }
 ];
 
+// El backend siempre devuelve el ranking de mayor a menor, así que el orden
+// ascendente se resuelve en el cliente sobre el array ya recibido.
+const SORTS = [
+    { id: 'desc', label: 'Mayor a menor', icon: '↓' },
+    { id: 'asc', label: 'Menor a mayor', icon: '↑' }
+];
+
 const TX_LABELS = {
     Participation: 'Participación',
     MatchWin: 'Victoria',
@@ -55,6 +62,7 @@ export default function Leaderboard() {
     const [teams, setTeams] = useState([]);
     const [myProgress, setMyProgress] = useState(null);
     const [selectedGame, setSelectedGame] = useState('all');
+    const [sortOrder, setSortOrder] = useState('desc');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -102,6 +110,13 @@ export default function Leaderboard() {
 
     const gameLabel = selectedGame === 'all' ? 'Global' : selectedGame;
 
+    // Ordena por puntos web; ante empate se respeta el orden que ya trae el backend.
+    const sortRows = (rows) =>
+        [...rows].sort((a, b) => {
+            const diff = (b.points || 0) - (a.points || 0);
+            return sortOrder === 'asc' ? -diff : diff;
+        });
+
     return (
         <div className="p-6 text-white max-w-6xl mx-auto min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -141,20 +156,42 @@ export default function Leaderboard() {
             </div>
 
             {mode !== 'me' && (
-                <div className="flex flex-wrap gap-2 mb-6">
-                    {AVAILABLE_GAMES.map(game => (
-                        <button
-                            key={game.id}
-                            onClick={() => handleSelectGame(game.id)}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
-                                selectedGame === game.id
-                                    ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40'
-                                    : 'bg-[#161b22] border-gray-800 text-gray-300 hover:border-gray-600'
-                            }`}
-                        >
-                            {game.name}
-                        </button>
-                    ))}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
+                    <div className="flex flex-wrap gap-2">
+                        {AVAILABLE_GAMES.map(game => (
+                            <button
+                                key={game.id}
+                                onClick={() => handleSelectGame(game.id)}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                                    selectedGame === game.id
+                                        ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40'
+                                        : 'bg-[#161b22] border-gray-800 text-gray-300 hover:border-gray-600'
+                                }`}
+                            >
+                                {game.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] uppercase tracking-wider text-gray-500">Orden</span>
+                        <div className="inline-flex rounded-lg border border-gray-800 bg-[#161b22] p-1">
+                            {SORTS.map(sort => (
+                                <button
+                                    key={sort.id}
+                                    onClick={() => setSortOrder(sort.id)}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
+                                        sortOrder === sort.id
+                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40'
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    <span className="font-mono mr-1">{sort.icon}</span>
+                                    {sort.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -169,9 +206,14 @@ export default function Leaderboard() {
                     Cargando ranking...
                 </div>
             ) : mode === 'players' ? (
-                <PlayersTable players={rankings} gameLabel={gameLabel} currentUser={currentUser} />
+                <PlayersTable
+                    players={sortRows(rankings)}
+                    gameLabel={gameLabel}
+                    currentUser={currentUser}
+                    sortOrder={sortOrder}
+                />
             ) : mode === 'teams' ? (
-                <TeamsTable teams={teams} gameLabel={gameLabel} />
+                <TeamsTable teams={sortRows(teams)} gameLabel={gameLabel} sortOrder={sortOrder} />
             ) : (
                 <MyProgress progress={myProgress} />
             )}
@@ -179,7 +221,7 @@ export default function Leaderboard() {
     );
 }
 
-function PlayersTable({ players, gameLabel, currentUser }) {
+function PlayersTable({ players, gameLabel, currentUser, sortOrder }) {
     if (players.length === 0) {
         return (
             <div className="bg-[#161b22] border border-gray-800 rounded-xl text-center py-12 text-gray-500 text-sm">
@@ -190,8 +232,11 @@ function PlayersTable({ players, gameLabel, currentUser }) {
 
     return (
         <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden shadow-xl">
-            <div className="px-4 py-3 border-b border-gray-800 bg-black/20 text-xs text-gray-400 uppercase tracking-wider">
-                Ranking de jugadores · {gameLabel}
+            <div className="px-4 py-3 border-b border-gray-800 bg-black/20 text-xs text-gray-400 uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                <span>Ranking de jugadores · {gameLabel}</span>
+                <span className="normal-case tracking-normal text-[11px] text-gray-500">
+                    {sortOrder === 'asc' ? '↑ menor a mayor' : '↓ mayor a menor'} · la posición # es el puesto real
+                </span>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -273,7 +318,7 @@ function PlayersTable({ players, gameLabel, currentUser }) {
     );
 }
 
-function TeamsTable({ teams, gameLabel }) {
+function TeamsTable({ teams, gameLabel, sortOrder }) {
     if (teams.length === 0) {
         return (
             <div className="bg-[#161b22] border border-gray-800 rounded-xl text-center py-12 text-gray-500 text-sm">
@@ -284,8 +329,11 @@ function TeamsTable({ teams, gameLabel }) {
 
     return (
         <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden shadow-xl">
-            <div className="px-4 py-3 border-b border-gray-800 bg-black/20 text-xs text-gray-400 uppercase tracking-wider">
-                Ranking de equipos · {gameLabel}
+            <div className="px-4 py-3 border-b border-gray-800 bg-black/20 text-xs text-gray-400 uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+                <span>Ranking de equipos · {gameLabel}</span>
+                <span className="normal-case tracking-normal text-[11px] text-gray-500">
+                    {sortOrder === 'asc' ? '↑ menor a mayor' : '↓ mayor a menor'} · la posición # es el puesto real
+                </span>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
