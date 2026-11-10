@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { getStoredUser, isModerator as checkModerator } from '../../utils/Roles';
 import { isIncompleteRankCondition } from '../../utils/teamRanks';
+import { teamFormatForGame } from '../../utils/teamFormat';
 import RankConditionBuilder from '../../components/RankConditionBuilder';
 import TournamentBracket from './TournamentBracket';
 
@@ -71,7 +72,9 @@ export default function TournamentDetailPage() {
         rankConditions: tData.rankConditions || '',
         startDate: toLocalInput(tData.startDate),
         endDate: toLocalInput(tData.endDate),
-        tournamentType: tData.tournamentType || 'Individual'
+        tournamentType: tData.tournamentType || 'Individual',
+        startersCount: tData.startersCount || teamFormatForGame(tData.gameName).starters,
+        substitutesCount: tData.substitutesCount ?? teamFormatForGame(tData.gameName).substitutes
       });
       setError(null);
     } catch (e) {
@@ -158,6 +161,8 @@ export default function TournamentDetailPage() {
       rules: editForm.rules,
       rankConditions: editForm.rankConditions,
       tournamentType: editForm.tournamentType,
+      startersCount: Number(editForm.startersCount) || teamFormatForGame(editForm.gameName).starters,
+      substitutesCount: Number(editForm.substitutesCount) || 0,
       startDate: editForm.startDate ? new Date(editForm.startDate).toISOString() : null,
       endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : null
     };
@@ -172,9 +177,9 @@ export default function TournamentDetailPage() {
   };
 
   const handleGenerateBracket = async () => {
-    if (!window.confirm('¿Generar las llaves ahora? El torneo pasará a "En curso".')) return;
+    if (!window.confirm('¿Iniciar el torneo ahora? Se generarán las llaves y pasará a "En curso" aunque la fecha de inicio todavía no haya llegado.')) return;
     const data = await call(`/tournaments/${id}/bracket`, { method: 'POST', body: '{}' });
-    if (Array.isArray(data)) alert('Llaves generadas.');
+    if (Array.isArray(data)) alert('Torneo iniciado. Llaves generadas.');
   };
 
   const handleVerifyRank = async (participant, verified) => {
@@ -204,8 +209,15 @@ export default function TournamentDetailPage() {
     );
   }
 
-  const regOpen = tournament.status === 'Próximo' && now >= new Date(tournament.startDate).getTime() - 30 * 60 * 1000;
-  const regNotYet = tournament.status === 'Próximo' && !regOpen;
+  const startTime = new Date(tournament.startDate).getTime();
+  const regOpen = tournament.status === 'Próximo' && now >= startTime - 30 * 60 * 1000 && now < startTime;
+  const regNotYet = tournament.status === 'Próximo' && now < startTime - 30 * 60 * 1000;
+  const regClosed = tournament.status === 'Próximo' && now >= startTime;
+
+  const teamFormat = teamFormatForGame(tournament.gameName);
+  const startersCount = tournament.startersCount > 0 ? tournament.startersCount : teamFormat.starters;
+  const substitutesCount = tournament.startersCount > 0 ? tournament.substitutesCount : teamFormat.substitutes;
+  const editTeamFormat = teamFormatForGame(editForm.gameName || tournament.gameName);
 
   return (
     <div className="p-6 text-white min-h-screen">
@@ -226,6 +238,12 @@ export default function TournamentDetailPage() {
               <p><span className="text-gray-500">Fin:</span> {new Date(tournament.endDate).toLocaleString()}</p>
               <p><span className="text-gray-500">Cupo:</span> {tournament.participants?.length || 0} / {tournament.maxParticipants}</p>
               <p><span className="text-gray-500">Condición de rango:</span> {tournament.rankConditions || 'Sin restricción declarada'}</p>
+              {tournament.tournamentType === 'Equipo' && (
+                <p><span className="text-gray-500">Formato de equipo:</span> {startersCount} titulares + {substitutesCount} suplentes</p>
+              )}
+              {canManage && (
+                <p><span className="text-gray-500">Creado por:</span> {tournament.createdByUsername || 'No registrado'}</p>
+              )}
             </div>
             {tournament.rules && (
               <div className="bg-gray-900/40 border border-gray-800 rounded-lg p-4">
@@ -243,6 +261,9 @@ export default function TournamentDetailPage() {
                 {regNotYet && (
                   <p className="text-sm text-amber-300">La inscripción se habilita 30 minutos antes del inicio ({new Date(new Date(tournament.startDate).getTime() - 30*60000).toLocaleString()}).</p>
                 )}
+                {regClosed && (
+                  <p className="text-sm text-amber-300">La inscripción se cerró al llegar la fecha de inicio. Un moderador puede iniciar el torneo ahora.</p>
+                )}
                 {tournament.tournamentType === 'Individual' ? (
                   isRegistered ? (
                     <p className="text-sm text-emerald-400">Ya estás inscripto en este torneo.</p>
@@ -255,7 +276,7 @@ export default function TournamentDetailPage() {
                   )
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-gray-400">Requisito: 5 titulares + 2 suplentes. Solo el capitán puede inscribir.</p>
+                    <p className="text-xs text-gray-400">Requisito: {startersCount} titulares + {substitutesCount} suplentes (máximo). Solo el capitán puede inscribir.</p>
                     {isFull && <p className="text-sm text-red-400">Cupo completo ({tournament.participants?.length || 0}/{tournament.maxParticipants}).</p>}
                     <div className="flex flex-wrap gap-2 items-center">
                       <select
@@ -289,7 +310,7 @@ export default function TournamentDetailPage() {
                   {tournament.status === 'Próximo' && (
                     <>
                       <button onClick={() => setEditing(v => !v)} disabled={busy} className="px-3 py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700">{editing ? 'Cerrar edición' : 'Editar torneo'}</button>
-                      <button onClick={handleGenerateBracket} disabled={busy} className="px-3 py-2 text-sm bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold">Generar llaves</button>
+                      <button onClick={handleGenerateBracket} disabled={busy} className="px-3 py-2 text-sm bg-purple-700 hover:bg-purple-600 rounded-lg font-semibold">Iniciar torneo ahora</button>
                     </>
                   )}
                   {tournament.status !== 'Finalizado' && tournament.status !== 'Cancelado' && (
@@ -300,13 +321,41 @@ export default function TournamentDetailPage() {
                 {editing && tournament.status === 'Próximo' && (
                   <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                     <input className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" value={editForm.title} onChange={e=>setEditForm({...editForm,title:e.target.value})} placeholder="Título" />
-                    <select className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" style={{colorScheme:'dark'}} value={editForm.gameName} onChange={e=>setEditForm({...editForm,gameName:e.target.value,rankConditions:'Sin restricción'})}>
+                    <select className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" style={{colorScheme:'dark'}} value={editForm.gameName} onChange={e=>{
+                      const gameName = e.target.value;
+                      const format = teamFormatForGame(gameName);
+                      setEditForm(prev => ({...prev, gameName, rankConditions:'Sin restricción', startersCount: format.starters, substitutesCount: format.substitutes}));
+                    }}>
                       {['Valorant','Counter-Strike 2','League of Legends','EA FC 27','Rocket League','CS:GO'].map(g=> <option key={g} value={g}>{g}</option>)}
                     </select>
                     <select className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" style={{colorScheme:'dark'}} value={editForm.tournamentType} onChange={e=>setEditForm({...editForm,tournamentType:e.target.value})}>
                       <option value="Individual">Individual</option>
                       <option value="Equipo">Equipo</option>
                     </select>
+                    {editForm.tournamentType === 'Equipo' && (
+                      <>
+                        <input
+                          type="number"
+                          min={1}
+                          max={editTeamFormat.maxStarters}
+                          className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm disabled:opacity-60"
+                          value={editForm.startersCount ?? editTeamFormat.starters}
+                          onChange={e=>setEditForm({...editForm,startersCount:e.target.value})}
+                          disabled={editTeamFormat.fixedStarters}
+                          placeholder="Titulares"
+                          title={editTeamFormat.fixedStarters ? `${editForm.gameName} juega con ${editTeamFormat.starters} titulares fijos` : 'Titulares'}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={11}
+                          className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm"
+                          value={editForm.substitutesCount ?? editTeamFormat.substitutes}
+                          onChange={e=>setEditForm({...editForm,substitutesCount:e.target.value})}
+                          placeholder="Suplentes"
+                        />
+                      </>
+                    )}
                     <input type="number" min={2} className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" value={editForm.maxParticipants} onChange={e=>setEditForm({...editForm,maxParticipants:e.target.value})} placeholder="Cupo" />
                     <input type="datetime-local" style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" value={editForm.startDate} onChange={e=>setEditForm({...editForm,startDate:e.target.value})} />
                     <input type="datetime-local" style={{colorScheme:'dark'}} className="p-2 bg-[#0d1117] border border-gray-800 rounded text-sm" value={editForm.endDate} min={editForm.startDate||undefined} onChange={e=>setEditForm({...editForm,endDate:e.target.value})} />
