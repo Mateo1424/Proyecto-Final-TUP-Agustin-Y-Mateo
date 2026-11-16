@@ -26,6 +26,8 @@ const UserProfilePage = () => {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isFollowing, setIsFollowing] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
     // Si el perfil pedido es el propio, llevamos a "Mi Perfil" (que permite editar)
@@ -35,6 +37,7 @@ const UserProfilePage = () => {
       navigate('/profile', { replace: true });
       return;
     }
+    setCurrentUserId(currentUser?.id ?? null);
 
     const fetchUserProfile = async () => {
       setLoading(true);
@@ -72,6 +75,20 @@ const UserProfilePage = () => {
         if (rankingResponse.ok) {
           setProgress(await rankingResponse.json());
         }
+
+        // Verificar estado de seguimiento usando la API de chat
+        if (currentUserId) {
+          try {
+            const followResponse = await apiFetch(`/chat/perfil/${id}`);
+            if (followResponse.ok) {
+              const followData = await followResponse.json();
+              setIsFollowing(followData.YaSigue ?? false);
+            }
+          } catch (err) {
+            console.error('Error al verificar seguimiento:', err);
+            setIsFollowing(false);
+          }
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -80,7 +97,7 @@ const UserProfilePage = () => {
     };
 
     fetchUserProfile();
-  }, [id, navigate]);
+  }, [id, navigate, currentUserId]);
 
   if (loading) return <div className="p-8 text-white">Cargando perfil...</div>;
   if (error) {
@@ -154,6 +171,40 @@ const UserProfilePage = () => {
           </div>
         </div>
       </header>
+
+      {/* Sección de Seguir / Dejar de seguir */}
+      {profile && currentUserId && currentUserId !== profile.id && (
+        <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800 space-y-4">
+          <h3 className="text-lg font-semibold text-white">Conexión</h3>
+          <div className="space-y-4">
+            {isFollowing === null ? (
+              <p className="text-xs text-gray-400">Cargando estado...</p>
+            ) : isFollowing ? (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => unfollowProfile(profile.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-medium transition shadow"
+                >
+                  Dejar de seguir
+                </button>
+                <button
+                  onClick={() => window.alert('Función: Enviar mensaje')}
+                  className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-medium transition shadow"
+                >
+                  Enviar mensaje
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => followProfile(profile.id)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium transition shadow"
+              >
+                Seguir
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Grid de Secciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -268,5 +319,43 @@ const UserProfilePage = () => {
     </div>
   );
 };
+
+const followProfile = async (userId) => {
+    try {
+      const response = await apiFetch(`/chat/seguir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId: userId })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'No se pudo seguir al usuario.');
+      }
+      const data = await response.json();
+      setIsFollowing(true);
+      alert('¡Ahora sigues a este usuario!');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const unfollowProfile = async (userId) => {
+    try {
+      const response = await apiFetch(`/chat/dejar-seguir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId: userId })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'No se pudo dejar de seguir al usuario.');
+      }
+      const data = await response.json();
+      setIsFollowing(false);
+      alert('Ya no sigues a este usuario.');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
 export default UserProfilePage;

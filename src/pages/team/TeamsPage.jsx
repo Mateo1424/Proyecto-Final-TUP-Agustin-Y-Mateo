@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../config';
 import { getStoredUser } from '../../utils/Roles';
 
@@ -21,6 +21,7 @@ export default function TeamsPage() {
   const [respondingId, setRespondingId] = useState(null);
   const user = useMemo(() => getStoredUser(), []);
   const userId = user?.id ?? null;
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,7 +131,7 @@ export default function TeamsPage() {
           {teams.map((team) => {
             const policy = teamPolicyLabel(team);
             return (
-              <Link to={`/teams/${team.id}`} key={team.id} className="block group">
+              <div onClick={() => navigate(`/teams/${team.id}`)} key={team.id} className="block group cursor-pointer">
                 <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between p-5 shadow-md group-hover:border-purple-500 transition">
                   <div className="flex items-center space-x-4 mb-4">
                     <img src={team.logoUrl} alt={team.name} className="w-14 h-14 object-cover rounded-full border border-purple-500/50 bg-gray-900" />
@@ -141,7 +142,7 @@ export default function TeamsPage() {
                     </div>
                   </div>
                   <div className="mb-3">
-                    <span className={`text-[11px] px-2 py-0.5 rounded border ${policy.open ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-amber-950/40 text-amber-300 border-amber-800/50'}`}>
+                    <span className={`text-[11px] px-2 py-0.5 rounded border ${policy.open ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-amber-950/40 text-amber-800/50'}`}>
                       {policy.text}
                     </span>
                   </div>
@@ -149,8 +150,20 @@ export default function TeamsPage() {
                     <span>Miembros: <strong className="text-white">{team.members?.length || 0}</strong></span>
                     <span className="text-purple-400 font-medium group-hover:underline">Ver detalles →</span>
                   </div>
+                  <div className="mt-3 text-sm text-gray-300">
+                    {team.members?.map((member, i) => (
+                      <div key={member.userId || i} className="flex items-center gap-2">
+                        <span
+                          onClick={() => navigate(`/users/${member.userId}`)}
+                          className="text-purple-400 hover:text-purple-300 transition underline cursor-pointer"
+                        >
+                          {member.username || member.name || `Miembro ${i + 1}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
