@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createServer } from 'vite';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Router } from 'wouter';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('ranking requests and views preserve game, kind, latest response and unrated state', async () => {
+  const cacheDir = await mkdtemp(join(tmpdir(), 'rankings-tests-'));
+  const server = await createServer({ cacheDir, configFile: false, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, hmr: false, ws: false }, appType: 'custom' });
+  try {
+    const { createEloRequest } = await server.ssrLoadModule('/src/hooks/useEloRequest.js');
+    const state = []; const request = createEloRequest(); let resolveOld;
+    const old = request.run(() => new Promise(resolve => { resolveOld = resolve; }), value => state.push(value));
+    await Promise.resolve();
+    await request.run(async () => 'new', value => state.push(value));
+    resolveOld('old'); await old;
+    assert.equal(state.at(-1).data, 'new');
+    assert.equal(state.some(value => value.data === 'old'), false);
+    await request.run(async () => { throw new Error('Sin conexión'); }, value => state.push(value));
+    assert.equal(state.at(-1).error, 'Sin conexión');
+    let signal; const pending = request.run(s => { signal = s; return new Promise(() => {}); }, () => {}); void pending;
+    await Promise.resolve(); request.cancel(); assert.equal(signal.aborted, true);
+    const { client } = await server.ssrLoadModule('/src/api/client.js');
+    const { getRankings, getCurrentElo, getEloHistory, GAMES } = await server.ssrLoadModule('/src/api/rankings.js');
+    const calls = []; client.defaults.adapter = async config => { calls.push(config); return { data: { items: [] }, status: 200, statusText: 'OK', headers: {}, config }; };
+    await getRankings('teams', 'Rocket League', 3);
+    await getCurrentElo('players', 'player-id', 'Valorant');
+    await getEloHistory('teams', 'team-id', 'CS:GO', 2);
+    assert.equal(calls[0].url, '/rankings/teams'); assert.deepEqual(calls[0].params, { gameName: 'Rocket League', page: 3, pageSize: 20 });
+    assert.equal(calls[1].url, '/rankings/players/player-id'); assert.equal(calls[1].params.gameName, 'Valorant');
+    assert.equal(calls[2].url, '/rankings/teams/team-id/history'); assert.equal(calls[2].params.page, 2);
+    assert.deepEqual(GAMES, ['League of Legends', 'Valorant', 'CS:GO', 'Rocket League']);
+    const { default: EloSummary } = await server.ssrLoadModule('/src/components/rankings/EloSummary.jsx');
+    const empty = renderToStaticMarkup(createElement(EloSummary, { current: { rating: null, position: null, matchesPlayed: 0, matchesWon: 0, matchesLost: 0 } }));
+    assert.match(empty, /Sin clasificación/); assert.doesNotMatch(empty, /1000|#null|Posición #/);
+    const rated = renderToStaticMarkup(createElement(EloSummary, { current: { rating: 1048, position: 58, matchesPlayed: 3, matchesWon: 3, matchesLost: 0 } }));
+    assert.match(rated, /1048/); assert.match(rated, /#58/);
+    const { default: EloHistory } = await server.ssrLoadModule('/src/components/rankings/EloHistory.jsx');
+    const history = renderToStaticMarkup(createElement(Router, { ssrPath: '/' }, createElement(EloHistory, { items: [{ id: 'one', tournamentId: 'tournament', before: 1000, after: 1016, result: 1, round: 1, position: 0, createdAt: '2026-11-19T12:00:00Z' }] })));
+    assert.match(history, /\+16/); assert.match(history, /1000/); assert.match(history, /1016/); assert.match(history, /\/tournaments\/tournament/);
+    const { default: RankingPagination } = await server.ssrLoadModule('/src/components/rankings/RankingPagination.jsx');
+    const paging = renderToStaticMarkup(createElement(RankingPagination, { page: 1, hasMore: false, loading: false, onPage() {} }));
+    assert.equal((paging.match(/disabled=""/g) || []).length, 2);
+    const { default: RankingTable } = await server.ssrLoadModule('/src/components/rankings/RankingTable.jsx');
+    const table = renderToStaticMarkup(createElement(Router, { ssrPath: '/' }, createElement(RankingTable, { kind: 'teams', page: 3, items: [{ entityId: 'team-id', name: 'Equipo', rating: 1234, points: 999999, matchesPlayed: 4, matchesWon: 3, matchesLost: 1 }] })));
+    assert.match(table, /1234/); assert.match(table, />41</); assert.match(table, /href="\/teams\/team-id"/); assert.doesNotMatch(table, /999999|pts/);
+    const { default: CurrentEloPanel } = await server.ssrLoadModule('/src/components/rankings/CurrentEloPanel.jsx');
+    const panel = renderToStaticMarkup(createElement(CurrentEloPanel, { entityId: 'player-id', games: [{ gameName: 'Valorant' }, { gameName: 'EA FC 27' }] }));
+    assert.match(panel, /<option[^>]*>Valorant<\/option>/); assert.doesNotMatch(panel, /EA FC 27|<option[^>]*>CS:GO/);
+    const noGame = renderToStaticMarkup(createElement(CurrentEloPanel, { entityId: 'player-id', games: [] }));
+    assert.match(noGame, /No hay videojuegos compatibles/); assert.doesNotMatch(noGame, /1000/);
+  } finally { await server.close(); }
+});

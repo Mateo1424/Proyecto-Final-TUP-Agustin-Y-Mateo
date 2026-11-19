@@ -1,0 +1,22 @@
+.rewards-page,.rewards-dialog{--reward-bg:#0b0e0d;--reward-surface:#121816;--reward-line:#34443c;--reward-muted:#a4b3aa;--reward-text:#f1f6ee;--reward-coral:#ff704f;--reward-lime:#c7f36b;background:var(--reward-bg);color:var(--reward-text);font-family:"Avenir Next","Trebuchet MS",sans-serif}
+.rewards-page{position:relative;isolation:isolate;min-width:0}
+.rewards-page .reward-title{margin:0;color:var(--reward-text);font-family:"Avenir Next Condensed","Arial Narrow",sans-serif;font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;line-height:1;letter-spacing:-.04em;text-transform:uppercase}
+.rewards-page .reward-eyebrow{margin:0 0 .65rem;color:var(--reward-lime);font-size:.7rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.rewards-page .reward-muted{color:var(--reward-muted)}
+.rewards-page .reward-panel{padding:1.5rem;border:1px solid var(--reward-line);border-top:3px solid var(--reward-lime);background:var(--reward-surface);overflow-wrap:anywhere}
+.rewards-page .reward-balance{border-left:3px solid var(--reward-lime);padding-left:1.25rem}
+.rewards-page .reward-notice{padding:1rem 1.25rem;border:1px solid var(--reward-line);background:var(--reward-surface);font-size:.9rem;line-height:1.6}
+.rewards-page .reward-button,.rewards-dialog .reward-button{padding:.7rem 1rem;border:1px solid var(--reward-line);background:var(--reward-surface);color:var(--reward-text);font-weight:700;cursor:pointer;transition:background .15s ease}
+.rewards-page .reward-primary,.rewards-dialog .reward-primary{background:var(--reward-coral);border-color:var(--reward-coral);color:#151b17}
+.rewards-page .reward-button:hover,.rewards-dialog .reward-button:hover{border-color:var(--reward-text)}
+.rewards-page .reward-primary:hover,.rewards-dialog .reward-primary:hover{background:#ff896d}
+.rewards-page button:disabled,.rewards-dialog button:disabled{opacity:.55;cursor:not-allowed}
+.rewards-page .reward-text-button{color:var(--reward-lime);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.rewards-page .reward-text-button:hover{color:var(--reward-text)}
+.rewards-page .reward-tab{padding:.75rem 1.1rem;border-bottom:2px solid transparent;color:var(--reward-muted);cursor:pointer}
+.rewards-page .reward-tab[aria-current="page"]{color:var(--reward-lime);border-color:var(--reward-lime)}
+.rewards-page .reward-tab:hover{color:var(--reward-text)}
+.rewards-page :focus-visible,.rewards-dialog :focus-visible{outline:2px solid var(--reward-lime);outline-offset:4px}
+.rewards-dialog{width:min(36rem,calc(100vw - 2rem));max-height:85vh;margin:auto;padding:0;border:1px solid var(--reward-line);overflow-y:auto}
+.rewards-dialog::backdrop{background:rgb(0 0 0 / .75)}
+@media(prefers-reduced-motion:reduce){.rewards-page *,.rewards-dialog *{transition:none!important}}

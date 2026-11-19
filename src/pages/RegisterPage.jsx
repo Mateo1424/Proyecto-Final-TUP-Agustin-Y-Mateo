@@ -1,70 +1,22 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { apiFetch, GOOGLE_LOGIN_URL } from '../config';
+import { useNavigate, Link } from '../routing/navigation';
+import { GOOGLE_LOGIN_URL } from '../config';
+import { request } from '../api/client';
+import { useSchemaForm } from '../hooks/useSchemaForm';
+import { registerSchema } from '../schemas/auth';
+import { useSessionStore } from '../store/session';
 
 const RegisterPage = () => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [game, setGame] = useState('Valorant');
-  const [inGameName, setInGameName] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { register, submit, formState: { errors, isSubmitting } } = useSchemaForm(registerSchema, { username: '', email: '', password: '', confirmPassword: '', game: 'Valorant', inGameName: '' });
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleRegister = submit(async values => {
     setError('');
-
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
-      return;
-    }
-
-    try {
-      const response = await apiFetch('/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          username, 
-          email, 
-          password,
-          confirmPassword: confirmPassword, 
-          games: [
-            {
-              gameName: game,
-              inGameName: inGameName, 
-              rank: 'Unranked'
-            }
-          ]
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || (errorData.errors ? Object.values(errorData.errors)[0][0] : 'Error al registrarse en el servidor.');
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-
-      // El token viaja en una cookie HttpOnly; acá solo guardamos los datos del usuario
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('username', data.user.username);
-      } else {
-        localStorage.setItem('username', username);
-      }
-      localStorage.removeItem('token'); // limpieza del esquema anterior
-
-      navigate('/dashboard');
-      
-    } catch (err) {
-      setError(err.message || 'Error al conectar con el servidor.');
-    }
-  };
+    const { game, inGameName, ...account } = values;
+    try { const data = await request('/auth/register', { method: 'POST', data: { ...account, games: [{ gameName: game, inGameName, rank: 'Unranked' }] } }); useSessionStore.getState().accept(data.user); navigate('/dashboard'); }
+    catch (failure) { setError(failure.message); }
+  });
 
   return (
     <div className="min-h-screen bg-[#0d1117] text-white flex items-center justify-center p-4">
@@ -83,13 +35,13 @@ const RegisterPage = () => {
         )}
 
         {/* Formulario */}
-        <form onSubmit={handleRegister} className="space-y-4">
+        <form noValidate onSubmit={handleRegister} className="space-y-4">
+          {Object.entries(errors).map(([field, error]) => <p key={field} role="alert" className="text-sm text-red-300">{error.message}</p>)}
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Nombre de usuario</label>
             <input 
               type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              {...register('username')}
               placeholder="KaizenMX"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -100,8 +52,7 @@ const RegisterPage = () => {
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Correo Electrónico</label>
             <input 
               type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register('email')}
               placeholder="tu@correo.com"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -111,14 +62,13 @@ const RegisterPage = () => {
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Juego Principal</label>
             <select 
-              value={game}
-              onChange={(e) => setGame(e.target.value)}
+              {...register('game')}
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
             >
               <option value="Valorant">Valorant</option>
-              <option value="Counter-Strike 2">Counter-Strike 2</option>
+              <option value="CS:GO">CS:GO</option>
               <option value="League of Legends">League of Legends</option>
-              <option value="FC 25">FC 25</option>
+              <option value="Rocket League">Rocket League</option>
             </select>
           </div>
 
@@ -126,8 +76,7 @@ const RegisterPage = () => {
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">ID / Nombre en el Juego</label>
             <input 
               type="text" 
-              value={inGameName}
-              onChange={(e) => setInGameName(e.target.value)}
+              {...register('inGameName')}
               placeholder="Ej: Player#1234"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -138,8 +87,7 @@ const RegisterPage = () => {
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Contraseña</label>
             <input 
               type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...register('password')}
               placeholder="••••••••"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -150,8 +98,7 @@ const RegisterPage = () => {
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Confirmar Contraseña</label>
             <input 
               type="password" 
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              {...register('confirmPassword')}
               placeholder="••••••••"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -159,7 +106,7 @@ const RegisterPage = () => {
           </div>
 
           <button 
-            type="submit"
+            type="submit" disabled={isSubmitting}
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition text-sm mt-2 shadow-lg shadow-purple-900/20"
           >
             Registrarse y Entrar

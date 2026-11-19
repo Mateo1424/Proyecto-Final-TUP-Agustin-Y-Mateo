@@ -1,4 +1,4 @@
-export const API_URL = "https://localhost:7039/api";
+export const API_URL = import.meta.env?.VITE_API_URL || "https://localhost:7039/api";
 export const GOOGLE_LOGIN_URL = `${API_URL}/auth/external/google`;
 
 // fetch que envía la cookie de sesión (access_token) en cada petición

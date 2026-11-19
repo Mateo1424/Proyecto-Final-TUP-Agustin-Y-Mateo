@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from '../../routing/navigation';
 import { invitationLabels, invitationStatus } from '../../utils/teamInvitations';
 
 export default function InvitationList({ invitations, sent = false, busy, onAction }) {

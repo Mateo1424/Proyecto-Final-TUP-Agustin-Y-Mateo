@@ -1,0 +1,3 @@
+import { z } from 'zod';
+export const loginSchema = z.object({ email: z.email('Ingresá un correo válido.'), password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(128) });
+export const registerSchema = loginSchema.extend({ username: z.string().trim().min(3, 'El usuario debe tener al menos 3 caracteres.').max(30), confirmPassword: z.string(), game: z.enum(['Valorant', 'League of Legends', 'CS:GO', 'Rocket League']), inGameName: z.string().trim().min(1, 'Ingresá tu nombre en el juego.') }).refine(data => data.password === data.confirmPassword, { path: ['confirmPassword'], message: 'Las contraseñas no coinciden.' });

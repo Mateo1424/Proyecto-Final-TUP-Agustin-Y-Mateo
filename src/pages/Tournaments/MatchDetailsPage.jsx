@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, Link } from '../../routing/navigation.js';
+import { request, isAborted } from '../../api/client.js';
 import { apiFetch } from '../../config';
 import { getStoredUser, isModerator as checkModerator } from '../../utils/Roles';
 
@@ -34,11 +35,6 @@ function StatEditor({ value, step, max, disabled, onCommit }) {
     const [draft, setDraft] = useState(String(value));
     const [focused, setFocused] = useState(false);
 
-    // Si el valor cambia desde el servidor y no se está escribiendo, se sincroniza
-    useEffect(() => {
-        if (!focused) setDraft(String(value));
-    }, [value, focused]);
-
     const clamp = (n) => {
         let v = Math.max(0, Math.round(n));
         if (max != null) v = Math.min(max, v);
@@ -60,9 +56,9 @@ function StatEditor({ value, step, max, disabled, onCommit }) {
                 type="number"
                 min={0}
                 max={max ?? undefined}
-                value={draft}
+                value={focused ? draft : String(value)}
                 disabled={disabled}
-                onFocus={() => setFocused(true)}
+                onFocus={() => { setDraft(String(value)); setFocused(true); }}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => {
                     setFocused(false);
@@ -117,39 +113,35 @@ export default function MatchDetailPage() {
     const user = getStoredUser();
     const moderator = checkModerator(user);
 
-    const load = useCallback((silent = false) => {
-        return apiFetch(`/tournaments/${id}/matches/${matchId}`)
-            .then(res => {
-                if (res.status === 404) throw new Error('Partido no encontrado.');
-                if (!res.ok) throw new Error('No se pudo cargar el partido.');
-                return res.json();
-            })
-            .then(data => {
-                setDetail(data);
-                setError(null);
-                setLoading(false);
-            })
-            .catch(err => {
-                // Una actualización silenciosa que falla no tapa lo que ya se está mostrando
-                if (!silent) setError(err.message);
-                setLoading(false);
-            });
+    const controller = useRef(null);
+    const activeKey = useRef(`${id}:${matchId}`);
+    const load = useCallback(async (silent = false) => {
+        controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
+        try {
+            const [data, tournament] = await Promise.all([
+                request(`/tournaments/${id}/matches/${matchId}`, {signal:abort.signal}),
+                request(`/tournaments/${id}`, {signal:abort.signal}),
+            ]);
+            if (!abort.signal.aborted) { setDetail({...data, closedAt:tournament.closedAt}); setError(null); setLoading(false); }
+        } catch(failure) { if(!isAborted(failure)) { if(!silent) setError(failure.message); else setActionError(failure.message); setLoading(false); } }
     }, [id, matchId]);
-
     useEffect(() => {
-        load();
-    }, [load]);
-
-    // Quienes miran (no moderadores) ven el partido actualizarse mientras no termina
-    const matchStatus = detail?.match?.status;
+        let alive = true; activeKey.current = `${id}:${matchId}`;
+        void Promise.resolve().then(() => { if(alive) return load(); });
+        const focus = () => { if(document.visibilityState === 'visible') void load(true); };
+        window.addEventListener('focus',focus);
+        return () => { alive = false; activeKey.current = null; controller.current?.abort(); window.removeEventListener('focus',focus); };
+    }, [load, id, matchId]);
     useEffect(() => {
-        if (!detail || moderator || matchStatus === 'Finalizado') return;
-        const timer = setInterval(() => load(true), 8000);
+        if (!detail || detail.closedAt) return;
+        const timer = setInterval(() => { if(document.visibilityState === 'visible') void load(true); },15000);
         return () => clearInterval(timer);
-    }, [detail, moderator, matchStatus, load]);
+    }, [detail, load]);
 
     // Llama al backend con una acción del moderador y vuelve a cargar el partido
     const callApi = async (path, options) => {
+        if (saving || detail?.closedAt) return;
+        const keyAtStart = activeKey.current;
         setSaving(true);
         setActionError('');
         try {
@@ -170,11 +162,11 @@ export default function MatchDetailPage() {
             if (response.status === 403) throw new Error('Solo los moderadores pueden hacer esto.');
             if (!response.ok) throw new Error(data?.message || `Error (${response.status})`);
 
-            await load(true);
+            if (activeKey.current === keyAtStart) await load(true);
         } catch (err) {
-            setActionError(err.message);
+            if (activeKey.current === keyAtStart) setActionError(err.message);
         } finally {
-            setSaving(false);
+            if (activeKey.current !== null) setSaving(false);
         }
     };
 
@@ -190,7 +182,7 @@ export default function MatchDetailPage() {
             body: JSON.stringify({ side, delta })
         });
 
-    if (loading) {
+    if (loading || (!error && detail && (detail.tournamentId !== id || detail.match?.id !== matchId))) {
         return <div className="flex justify-center items-center h-screen text-white">Cargando partido...</div>;
     }
 
@@ -213,7 +205,7 @@ export default function MatchDetailPage() {
     const inPlay = detail.tournamentStatus === 'En curso' || detail.tournamentStatus === 'Finalizado';
 
     // Solo moderadores editan. Los demás ven todo sin controles (el backend también lo valida).
-    const canEditStats = moderator && inPlay;
+    const canEditStats = moderator && inPlay && !detail.closedAt;
     const canEditScore = canEditStats && !finished;
 
     const aWins = !!match.winnerUserId && match.playerA?.userId === match.winnerUserId;

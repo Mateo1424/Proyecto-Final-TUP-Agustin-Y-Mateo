@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '../../routing/navigation';
 import InvitationList from '../../components/team/InvitationList';
 import { teamRequest } from '../../utils/teamInvitations';
 

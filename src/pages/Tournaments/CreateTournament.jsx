@@ -1,28 +1,31 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../../config';
+import { useForm, useWatch } from 'react-hook-form';
+import { tournamentCreateSchema, createTournamentPayload } from '../../schemas/tournamentCreate.js';
+import { request } from '../../api/client.js';
+import { useNavigate } from '../../routing/navigation.js';
+
 
 // Portadas oficiales garantizadas con enlaces estables
 const AVAILABLE_GAMES = [
-  { 
-    id: 'valorant', 
-    name: 'Valorant', 
-    logo: 'https://tse-mm.bing.com/th?q=Is%20Valorant%20Free%20On%20Epic%20Games%20apk' 
+  {
+    id: 'valorant',
+    name: 'Valorant',
+    logo: 'https://tse-mm.bing.com/th?q=Is%20Valorant%20Free%20On%20Epic%20Games%20apk'
   },
-  { 
-    id: 'cs2', 
-    name: 'Counter-Strike 2', 
-    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSkDcI7i9tjZi5-HotgteoLq1kbXJSOHkrWH1ljMkTbqfiEFUviRptY-CM&s=10' 
+  {
+    id: 'cs2',
+    name: 'CS:GO',
+    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSkDcI7i9tjZi5-HotgteoLq1kbXJSOHkrWH1ljMkTbqfiEFUviRptY-CM&s=10'
   },
-  { 
-    id: 'lol', 
-    name: 'League of Legends', 
-    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQA8c_f1NJwqS5sQI8B1wG6d5KvdX9iMhxKEomW_DNqOg&s=10' 
+  {
+    id: 'lol',
+    name: 'League of Legends',
+    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQA8c_f1NJwqS5sQI8B1wG6d5KvdX9iMhxKEomW_DNqOg&s=10'
   },
-  { 
-    id: 'eafc27', 
-    name: 'EA FC 27', 
-    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTzVePMddak4LGngyCU9nWoLCdopSHPgZvCP7g1ogvB5Q&s=10' 
+  {
+    id: 'rocketleague',
+    name: 'Rocket League',
+    logo: ''
   }
 ];
 
@@ -46,18 +49,10 @@ const dateInputClass =
 
 export default function CreateTournament() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    title: '',
-    gameName: 'Valorant',
-    tournamentType: 'Individual',
-    description: '',
-    startDate: '',
-    endDate: '',
-    maxParticipants: 16,
-    rules: '',
-    bannerUrl: '',
-    rankConditions: ''
-  });
+  const [serverError, setServerError] = useState('');
+  const {register, control, setValue, handleSubmit: submitForm, setError, formState:{errors,isSubmitting}} = useForm({defaultValues:{title:'',gameName:'Valorant',tournamentType:'Individual',startDate:'',endDate:'',maxParticipants:8,rules:'',bannerUrl:'',rankConditions:'Sin restricción',isFree:false}});
+  const formData = useWatch({control});
+  const setFormData = next => { for(const [name,value] of Object.entries(next)) setValue(name,value,{shouldDirty:true}); };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -78,71 +73,20 @@ export default function CreateTournament() {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!localStorage.getItem('user')) {
-      alert('Debes iniciar sesión para crear un torneo.');
-      navigate('/login');
-      return;
-    }
-
-    // Validación de fechas en el cliente
-    if (new Date(formData.endDate) < new Date(formData.startDate)) {
-      alert('La fecha de finalización no puede ser anterior a la fecha de inicio.');
-      return;
-    }
-
-    const maxParticipants = Number(formData.maxParticipants);
-    if (!Number.isInteger(maxParticipants) || maxParticipants < 2) {
-      alert('El torneo necesita al menos 2 participantes.');
-      return;
-    }
-
-    const finalBannerUrl = formData.bannerUrl.trim() !== '' 
-      ? formData.bannerUrl 
-      : (AVAILABLE_GAMES.find(g => g.name === formData.gameName)?.logo || "https://images.unsplash.com/photo-1616469829941-c7200edec809?q=80&w=1000&auto=format&fit=crop");
-
-    // Las fechas se envían en UTC para que no dependan de la zona horaria del servidor
-    const payload = {
-      ...formData,
-      maxParticipants,
-      bannerUrl: finalBannerUrl,
-      startDate: new Date(formData.startDate).toISOString(),
-      endDate: new Date(formData.endDate).toISOString()
-    };
-
-    try {
-      const response = await apiFetch('/tournaments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        alert('¡Torneo creado con éxito!');
-        navigate('/tournaments');
-      } else if (response.status === 401) {
-        alert('Tu sesión expiró. Volvé a iniciar sesión.');
-        localStorage.removeItem('user');
-        navigate('/login');
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        alert(`Error al crear el torneo: ${errorData.message || 'Verifica los datos'}`);
-      }
-    } catch (error) {
-      console.error('Error de red:', error);
-      alert('Error de conexión con el servidor.');
-    }
-  };
+  const handleSubmit = submitForm(async values => {
+    const parsed = tournamentCreateSchema.safeParse(values);
+    if (!parsed.success) { for (const issue of parsed.error.issues) setError(issue.path[0] || 'root', {message:issue.message}); return; }
+    setServerError('');
+    try { await request('/tournaments',{method:'POST',data:createTournamentPayload(parsed.data)}); navigate('/tournaments'); }
+    catch (error) { setServerError(error.message); }
+  });
 
   return (
     <div className="p-6 text-white max-w-3xl mx-auto">
       <h2 className="text-3xl font-extrabold mb-6 tracking-wide">Crear Nuevo Torneo</h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        
+      {serverError && <p role="alert" className="mb-4 text-red-300">{serverError}</p>}
+      <form noValidate onSubmit={handleSubmit} className="space-y-6">
+
         <div>
           <label className="block text-sm font-semibold mb-3">Tipo de Torneo</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -158,7 +102,7 @@ export default function CreateTournament() {
               className={`cursor-pointer border rounded-xl p-4 transition ${formData.tournamentType === 'Equipo' ? 'border-purple-500 bg-purple-950/30' : 'border-gray-800 bg-[#161b22] hover:border-gray-600'}`}
             >
               <div className="font-bold">Por Equipos</div>
-              <div className="text-xs text-gray-400">5 titulares + 2 suplentes (solo capitán inscribe)</div>
+              <div className="text-xs text-gray-400">5 titulares fijos; cada uno confirma y paga su entrada</div>
             </div>
           </div>
         </div>
@@ -173,17 +117,17 @@ export default function CreateTournament() {
                   key={game.id}
                   onClick={() => handleGameSelect(game.name)}
                   className={`cursor-pointer border rounded-xl overflow-hidden flex flex-col justify-between transition relative group ${
-                    isSelected 
-                      ? 'border-purple-500 ring-2 ring-purple-500/50 bg-purple-950/30' 
+                    isSelected
+                      ? 'border-purple-500 ring-2 ring-purple-500/50 bg-purple-950/30'
                       : 'border-gray-800 bg-[#161b22] hover:border-gray-600'
                   }`}
                 >
                   <div className="h-32 w-full relative overflow-hidden bg-gray-900">
-                    <img 
-                      src={game.logo} 
-                      alt={game.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
-                    />
+                    {game.logo ? <img
+                      src={game.logo}
+                      alt={game.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    /> : <div className="flex h-full items-center justify-center px-4 text-lg font-bold text-gray-300">{game.name}</div>}
                     <div className="absolute top-2 right-2 w-5 h-5 rounded-full border border-white/80 flex items-center justify-center bg-black/60 shadow">
                       {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>}
                     </div>
@@ -202,13 +146,10 @@ export default function CreateTournament() {
 
         <div>
           <label className="block text-sm font-semibold mb-1">Título del Torneo</label>
-          <input name="title" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Nexus Arena Championship" required />
+          <input {...register('title')} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Nexus Arena Championship" required />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold mb-1">Descripción</label>
-          <textarea name="description" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Breve descripción del evento..." />
-        </div>
+
 
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -216,7 +157,7 @@ export default function CreateTournament() {
               <label className="block text-sm font-semibold mb-1">Fecha y Hora de Inicio</label>
               <input
                 type="datetime-local"
-                name="startDate"
+                {...register('startDate')}
                 value={formData.startDate}
                 onChange={handleChange}
                 onClick={openPicker}
@@ -229,7 +170,7 @@ export default function CreateTournament() {
               <label className="block text-sm font-semibold mb-1">Fecha y Hora de Fin</label>
               <input
                 type="datetime-local"
-                name="endDate"
+                {...register('endDate')}
                 value={formData.endDate}
                 min={formData.startDate || undefined}
                 onChange={handleChange}
@@ -266,26 +207,29 @@ export default function CreateTournament() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-semibold mb-1">Máx. Participantes</label>
-            <input type="number" name="maxParticipants" min={2} value={formData.maxParticipants} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" />
+            <input type="number" {...register('maxParticipants',{valueAsNumber:true})} readOnly value={8} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-semibold mb-1">URL del Banner <span className="text-gray-500 font-normal">(Opcional)</span></label>
-            <input name="bannerUrl" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Si lo dejas vacío, usará la portada del juego seleccionado" />
+            <input {...register('bannerUrl')} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Si lo dejas vacío, usará la portada del juego seleccionado" />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-semibold mb-1">Reglas Clave</label>
-          <textarea name="rules" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Puntualidad, formato de partidas..." required />
+          <textarea {...register('rules')} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Puntualidad, formato de partidas..." required />
         </div>
 
         <div>
           <label className="block text-sm font-semibold mb-1">Condiciones de Rango</label>
-          <input name="rankConditions" onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Ej: Libre para todos los rangos / Solo Diamante+" required />
+          <input {...register('rankConditions')} onChange={handleChange} className="w-full p-2.5 bg-[#161b22] border border-gray-800 rounded-lg text-white focus:border-purple-500 outline-none" placeholder="Sin restricción / Mínimo: Oro 1" required />
         </div>
 
-        <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40 cursor-pointer">
-          Guardar y Crear Torneo
+        <label className="flex items-center gap-3"><input type="checkbox" {...register('isFree')} /> Torneo gratuito</label>
+        <p className="text-sm text-gray-300">Ocho {formData.tournamentType === 'Equipo' ? 'equipos de cinco titulares' : 'jugadores'}. {formData.isFree ? 'Entrada gratis; 50 puntos por completar y 100 adicionales al ganar, con límite diario de 200.' : 'Entrada: 250 puntos por jugador. Premios individuales: 1.000 / 600 / 200 puntos para campeón, subcampeón y semifinalistas.'} Los valores los fija el backend.</p>
+        {Object.entries(errors).map(([name,error]) => <p role="alert" key={name} className="text-sm text-red-300">{error.message}</p>)}
+        <button disabled={isSubmitting} type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40 cursor-pointer">
+          {isSubmitting ? 'Creando…' : 'Guardar y Crear Torneo'}
         </button>
       </form>
     </div>

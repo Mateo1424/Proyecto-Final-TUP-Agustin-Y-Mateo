@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../../config'; 
+import { useEffect, useState } from 'react';
+import { useNavigate } from '../../routing/navigation.js';
+import { request, isAborted } from '../../api/client.js';
+import { points } from '../../utils/format.js';
 import { getStoredUser, isModerator } from '../../utils/Roles';
 
 export default function TournamentsPage() {
@@ -13,20 +14,9 @@ export default function TournamentsPage() {
     const canCreate = isModerator(getStoredUser());
 
     useEffect(() => {
-        // Petición al backend usando la URL centralizada
-        fetch(`${API_URL}/tournaments`)
-            .then(response => {
-                if (!response.ok) throw new Error('Error al cargar los torneos');
-                return response.json();
-            })
-            .then(data => {
-                setTournaments(data);
-                setLoading(false);
-            })
-            .catch(err => {
-                setError(err.message);
-                setLoading(false);
-            });
+        const abort = new AbortController();
+        request('/tournaments', { signal: abort.signal }).then(data => { if(!abort.signal.aborted) { setTournaments(data); setLoading(false); } }).catch(failure => { if(!isAborted(failure)) { setError(failure.message); setLoading(false); } });
+        return () => abort.abort();
     }, []);
 
     if (loading) {
@@ -71,15 +61,15 @@ export default function TournamentsPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {tournaments.map(tournament => (
-                            <div 
+                            <div
                                 key={tournament.id}
                                 onClick={() => navigate(`/tournaments/${tournament.id}`)}
                                 className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden hover:border-purple-600 transition cursor-pointer flex flex-col justify-between"
                             >
                                 <div>
                                     <div className="h-40 bg-gray-900 relative">
-                                        <img 
-                                            src={tournament.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop"} 
+                                        <img
+                                            src={tournament.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop"}
                                             alt={tournament.title}
                                             className="w-full h-full object-cover"
                                         />
@@ -89,10 +79,10 @@ export default function TournamentsPage() {
                                     </div>
                                     <div className="p-5">
                                         <span className="text-xs font-medium text-purple-400 uppercase tracking-wider">{tournament.gameName}</span>
-                                        <h3 className="text-xl font-bold mt-1 text-white">{tournament.title}</h3>
+                                        <h3 className="text-xl font-bold mt-1 text-white">{tournament.title}</h3><p className="mt-2 text-sm text-gray-400">Entrada: {tournament.isFree ? "Gratis" : points(tournament.entryPoints)} por jugador</p>
                                         <div className="flex items-center justify-between mt-4 text-sm text-gray-300">
-                                            <span>Pozo de Premios:</span>
-                                            <span className="text-emerald-400 font-bold">€{tournament.prizePool}</span>
+                                            <span>{tournament.isFree ? "Torneo gratuito" : "Pozo de premios:"}</span>
+                                            <span className="text-emerald-400 font-bold">{tournament.isFree ? "Participación válida" : points(tournament.prizePool)}</span>
                                         </div>
                                     </div>
                                 </div>

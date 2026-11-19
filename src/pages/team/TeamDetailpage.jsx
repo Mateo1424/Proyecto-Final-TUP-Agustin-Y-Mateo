@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from '../../routing/navigation';
 import { apiFetch } from '../../config';
 import { getStoredUser } from '../../utils/Roles';
 import TeamInvitationsPanel from '../../components/team/TeamInvitationsPanel';
+import CurrentEloPanel from '../../components/rankings/CurrentEloPanel';
 
 export default function TeamDetailPage() {
     const { id } = useParams();
@@ -14,6 +15,7 @@ export default function TeamDetailPage() {
     const [leaving, setLeaving] = useState(false);
     const [saving, setSaving] = useState(false);
     const actionLock = useRef(false);
+    const teamRequest = useRef(null);
 
     // Estados de edición para el capitán (RF-10)
     const [isEditingTeam, setIsEditingTeam] = useState(false);
@@ -22,19 +24,24 @@ export default function TeamDetailPage() {
     const user = getStoredUser();
 
     const fetchTeam = useCallback(() => {
-        apiFetch(`/teams/${id}`)
+        teamRequest.current?.abort();
+        const controller = new AbortController();
+        teamRequest.current = controller;
+        apiFetch(`/teams/${id}`, { signal: controller.signal })
             .then(res => {
                 if (res.status === 404) throw new Error('Equipo no encontrado.');
                 if (!res.ok) throw new Error('No se pudo cargar el detalle del equipo.');
                 return res.json();
             })
             .then(data => {
+                if (controller.signal.aborted) return;
                 setTeam(data);
                 setEditTeamForm({ name: data.name, tag: data.tag, logoUrl: data.logoUrl, isPrivate: Boolean(data.isPrivate) });
                 setError(null);
                 setLoading(false);
             })
             .catch(err => {
+                if (controller.signal.aborted) return;
                 setError(err.message);
                 setLoading(false);
             });
@@ -42,6 +49,7 @@ export default function TeamDetailPage() {
 
     useEffect(() => {
         fetchTeam();
+        return () => teamRequest.current?.abort();
     }, [fetchTeam]);
 
     const handleSessionExpired = () => {
@@ -156,7 +164,7 @@ export default function TeamDetailPage() {
         }
     };
 
-    if (loading || (team && team.id !== id)) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
+    if (loading || (!error && team && team.id !== id)) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
     if (error) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-red-400">Error: {error}</div>;
     if (!team) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Equipo no encontrado.</div>;
 
@@ -208,6 +216,8 @@ export default function TeamDetailPage() {
                         )}
                     </div>
                 </div>
+
+                <CurrentEloPanel kind="teams" entityId={team.id} games={[team.gameName]} />
 
                 {/* Panel de edición de equipo (RF-10) */}
                 {isCaptain && isEditingTeam && (

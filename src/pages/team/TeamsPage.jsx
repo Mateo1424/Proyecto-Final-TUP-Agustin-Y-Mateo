@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '../../routing/navigation';
 import { apiFetch } from '../../config';
 
 export default function TeamsPage() {
@@ -30,7 +30,7 @@ export default function TeamsPage() {
   };
 
   useEffect(() => {
-    loadTeams();
+    Promise.resolve().then(loadTeams);
   }, []);
 
   if (loading) {

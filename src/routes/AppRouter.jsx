@@ -1,14 +1,12 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-
+import { Router, Switch, Route, Redirect } from 'wouter';
 import '../theme.css';
 import LedBackground from '../components/layout/LedBackground';
 import LoadingScreen from '../components/layout/LoadingScreen';
-import { getStoredUser, isModerator } from '../utils/Roles';
-
+import { isModerator } from '../utils/Roles';
+import { useSessionStore } from '../store/session';
 import MainLayout from '../components/layout/MainLayout';
 import SessionRoute from '../components/SessionRoute';
-
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const RegisterPage = lazy(() => import('../pages/RegisterPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
@@ -23,51 +21,33 @@ const TeamInvitationsPage = lazy(() => import('../pages/team/TeamInvitationsPage
 const CreateTeam = lazy(() => import('../pages/team/CreateTeam'));
 const TeamDetailPage = lazy(() => import('../pages/team/TeamDetailpage'));
 const Leaderboard = lazy(() => import('../components/layout/Rankings/Leaderboard'));
-
-const ModeratorRoute = () => {
-  return isModerator(getStoredUser()) ? <Outlet /> : <Navigate to="/tournaments" replace />;
-};
-
-const AppRouter = () => {
-  return (
-    <Router>
-      <LedBackground />
-
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route element={<SessionRoute key="public" authenticated={false} />}>
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/login" element={<LoginPage />} />
-          </Route>
-
-          <Route element={<SessionRoute key="private" authenticated />}>
-            <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/users/:id" element={<UserProfilePage />} />
-
-              <Route path="/tournaments" element={<TournamentsPage />} />
-              <Route element={<ModeratorRoute />}>
-                <Route path="/tournaments/create" element={<CreateTournament />} />
-              </Route>
-              <Route path="/tournaments/:id" element={<TournamentDetailPage />} />
-              <Route path="/tournaments/:id/matches/:matchId" element={<MatchDetailPage />} />
-
-              <Route path="/team-invitations" element={<TeamInvitationsPage />} />
-              <Route path="/teams" element={<TeamsPage />} />
-              <Route path="/teams/create" element={<CreateTeam />} />
-              <Route path="/teams/:id" element={<TeamDetailPage />} />
-
-              <Route path="/rankings" element={<Leaderboard />} />
-            </Route>
-          </Route>
-
-          <Route path="/" element={<Navigate to="/register" replace />} />
-          <Route path="*" element={<Navigate to="/register" replace />} />
-        </Routes>
-      </Suspense>
-    </Router>
-  );
-};
-
-export default AppRouter;
+const RewardsPage = lazy(() => import('../pages/rewards/RewardsPage'));
+const MyEnrollmentsPage = lazy(() => import('../pages/Tournaments/MyEnrollmentsPage'));
+function AuthorizedContent({ children, staff }) {
+  const user = useSessionStore(state => state.user);
+  return staff && !isModerator(user) ? <Redirect to="/tournaments" replace /> : <MainLayout>{children}</MainLayout>;
+}
+function Private({ children, staff = false }) {
+  return <SessionRoute authenticated><AuthorizedContent staff={staff}>{children}</AuthorizedContent></SessionRoute>;
+}
+export default function AppRouter() {
+  return <Router><LedBackground /><Suspense fallback={<LoadingScreen />}><Switch>
+    <Route path="/login"><SessionRoute authenticated={false}><LoginPage /></SessionRoute></Route>
+    <Route path="/register"><SessionRoute authenticated={false}><RegisterPage /></SessionRoute></Route>
+    <Route path="/dashboard"><Private><DashboardPage /></Private></Route>
+    <Route path="/profile"><Private><ProfilePage /></Private></Route>
+    <Route path="/users/:id"><Private><UserProfilePage /></Private></Route>
+    <Route path="/tournaments/create"><Private staff><CreateTournament /></Private></Route>
+    <Route path="/tournaments/:id/matches/:matchId"><Private><MatchDetailPage /></Private></Route>
+    <Route path="/tournaments/:id"><Private><TournamentDetailPage /></Private></Route>
+    <Route path="/tournaments"><Private><TournamentsPage /></Private></Route>
+    <Route path="/tournament-enrollments"><Private><MyEnrollmentsPage /></Private></Route>
+    <Route path="/team-invitations"><Private><TeamInvitationsPage /></Private></Route>
+    <Route path="/teams/create"><Private><CreateTeam /></Private></Route>
+    <Route path="/teams/:id"><Private><TeamDetailPage /></Private></Route>
+    <Route path="/teams"><Private><TeamsPage /></Private></Route>
+    <Route path="/rankings"><Private><Leaderboard /></Private></Route>
+    <Route path="/rewards"><Private><RewardsPage /></Private></Route>
+    <Route><Redirect to="/register" replace /></Route>
+  </Switch></Suspense></Router>;
+}

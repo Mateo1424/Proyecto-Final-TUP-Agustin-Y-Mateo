@@ -1,15 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const DashboardPage = () => {
-  const [username, setUsername] = useState('Usuario');
+  const [username] = useState(() => localStorage.getItem('username') || 'Usuario');
 
-  useEffect(() => {
-    // Recuperamos el nombre del usuario logueado desde el localStorage
-    const storedUsername = localStorage.getItem('username');
-    if (storedUsername) {
-      setUsername(storedUsername);
-    }
-  }, []);
 
   // Extraemos la primera letra para el avatar dinámico
   const userInitial = username ? username.charAt(0).toUpperCase() : 'U';

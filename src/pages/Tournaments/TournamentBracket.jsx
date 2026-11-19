@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { apiFetch } from '../../config';
 import { getGameRules } from '../../utils/GameRules';
-import { Link } from 'react-router-dom';
+import { Link } from '../../routing/navigation.js';
 
 const roundName = (round, totalRounds) => {
     const fromFinal = totalRounds - round;
@@ -152,6 +152,7 @@ export default function TournamentBracket({
     matches,
     currentUserId,
     canManage = false,
+    closedAt = null,
     gameName = '',
     disqualifiedIds = [],
     onMatchesUpdated
@@ -162,6 +163,7 @@ export default function TournamentBracket({
 
     if (!matches || matches.length === 0) return null;
 
+    const manage = canManage && !closedAt;
     const rules = getGameRules(gameName);
     const disqualified = new Set(disqualifiedIds);
 
@@ -180,6 +182,7 @@ export default function TournamentBracket({
 
     // Llama al backend; si responde con las llaves actualizadas, se las pasa a la página
     const callApi = async (path, options) => {
+        if (!manage) return false;
         setBusy(true);
         setError('');
         try {
@@ -240,7 +243,7 @@ export default function TournamentBracket({
                 </div>
             )}
 
-            {canManage && (
+            {manage && (
                 <div className="text-xs text-gray-400 border border-gray-800/80 rounded-lg px-3 py-2 bg-gray-900/40">
                     <span className="font-semibold text-purple-300">Modo moderador.</span>{' '}
                     <span className="font-mono">− +</span> ajustan el marcador ({rules.unit.toLowerCase()}
@@ -273,7 +276,7 @@ export default function TournamentBracket({
                                     const aWins = hasWinner && match.playerA?.userId === match.winnerUserId;
                                     const bWins = hasWinner && match.playerB?.userId === match.winnerUserId;
                                     const bothDefined = !!match.playerA && !!match.playerB;
-                                    const editable = canManage && !match.isBye && bothDefined;
+                                    const editable = manage && !match.isBye && bothDefined;
                                     const live = editable && !hasWinner;
                                     const isEditing = editingId === match.id;
 
@@ -292,7 +295,7 @@ export default function TournamentBracket({
                                     return (
                                         <div
                                             key={match.id}
-                                            className={`${canManage ? 'w-80' : 'w-56'} bg-gray-900/60 border border-gray-800/80 rounded-lg overflow-hidden`}
+                                            className={`${manage ? 'w-80' : 'w-56'} bg-gray-900/60 border border-gray-800/80 rounded-lg overflow-hidden`}
                                         >
                                             <PlayerRow
                                                 player={match.playerA}

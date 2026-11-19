@@ -1,324 +1,56 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { apiFetch } from '../../config';
+import { useState } from 'react';
+import { useParams, useNavigate, Link } from '../../routing/navigation.js';
+import { request } from '../../api/client.js';
+import { cancelEnrollment, cancelTournament, closeTournament, confirmEnrollment } from '../../api/tournaments.js';
 import { getStoredUser, isModerator as checkModerator } from '../../utils/Roles';
+import { points } from '../../utils/format.js';
+import { canEditTournament, registrationState } from '../../utils/tournamentRules.js';
+import { useTournamentDetails } from '../../hooks/useTournamentDetails.js';
+import EnrollmentCard from '../../components/tournaments/EnrollmentCard.jsx';
+import TournamentEconomy from '../../components/tournaments/TournamentEconomy.jsx';
 import TournamentBracket from './TournamentBracket';
 
 export default function TournamentDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [tournament, setTournament] = useState(null);
-    const [matches, setMatches] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [registering, setRegistering] = useState(false);
-    const [deleting, setDeleting] = useState(false);
-    const [generating, setGenerating] = useState(false);
-    const [disqualifyingId, setDisqualifyingId] = useState(null);
-    const [userTeams, setUserTeams] = useState([]);
-    const [registeringTeam, setRegisteringTeam] = useState(false);
-
-    // Datos del usuario guardados al iniciar sesión (el token va en la cookie)
     const user = getStoredUser();
-
-    // Solo los moderadores gestionan torneos (el backend también lo valida)
     const isModerator = checkModerator(user);
-    const canDelete = isModerator;
-
-    const fetchTournament = () => {
-        apiFetch(`/tournaments/${id}`)
-            .then(res => {
-                if (!res.ok) throw new Error('No se pudo cargar el detalle del torneo.');
-                return res.json();
-            })
-            .then(data => {
-                setTournament(data);
-                setLoading(false);
-            })
-            .catch(err => {
-                setError(err.message);
-                setLoading(false);
-            });
+    const { tournament, matches, teams: userTeams, enrollments, loading, error, busy, now, load, mutate } = useTournamentDetails(id, user?.id);
+    const [actionError, setActionError] = useState('');
+    const registering = busy === 'register';
+    const cancelling = busy === 'cancel';
+    const generating = busy === 'bracket';
+    const disqualifyingId = busy.startsWith('disqualify:') ? busy.slice(11) : null;
+    const action = async (key, operation, question) => {
+        if (busy || question && !window.confirm(question)) return;
+        setActionError('');
+        try { await mutate(key, operation); } catch (failure) { setActionError(failure.message); }
     };
-
-    const fetchMatches = () => {
-        apiFetch(`/tournaments/${id}/matches`)
-            .then(res => (res.ok ? res.json() : []))
-            .then(data => setMatches(Array.isArray(data) ? data : []))
-            .catch(() => setMatches([]));
+    const handleRegister = () => {
+        if (!user) { navigate('/login'); return; }
+        return action('register', () => request(`/tournaments/${id}/register`, { method:'POST', data: { userId:user.id, username:user.username, inGameName:'', rank:'', registeredAt:new Date().toISOString() } }), `Confirmás tu inscripción y el pago de ${tournament.isFree ? '0 puntos' : points(tournament.entryPoints)}?`);
     };
-
-    const fetchUserTeams = () => {
-        if (!user) return;
-        apiFetch('/teams')
-            .then(res => (res.ok ? res.json() : []))
-            .then(data => {
-                if (Array.isArray(data)) {
-                    const mine = data.filter(t => t.members?.some(m => m.userId === user.id));
-                    setUserTeams(mine);
-                }
-            })
-            .catch(() => setUserTeams([]));
+    const handleRegisterTeam = teamId => action('register', () => request(`/tournaments/${id}/register-team`, { method:'POST', data:{teamId} }), `Vas a confirmar tu presencia y pagar tu propia entrada (${tournament.isFree ? 'gratis' : points(tournament.entryPoints)}). Los otros cuatro titulares deben confirmar por su cuenta; no se reserva plaza.`);
+    const handleConfirm = requestId => action('confirm', () => confirmEnrollment(id, requestId), `Confirmás tu presencia y tu propio pago (${tournament.isFree ? 'gratis' : points(tournament.entryPoints)})?`);
+    const handleCancelRequest = requestId => action('withdraw', () => cancelEnrollment(id, requestId), 'Cancelar esta solicitud devuelve los puntos a todos los titulares que ya pagaron. ¿Continuar?');
+    const handleCancelTournament = () => action('cancel', () => cancelTournament(id), `Cancelar "${tournament.title}" conserva el historial y devuelve las entradas cobradas. ¿Continuar?`);
+    const handleClose = () => action('close', () => closeTournament(id), 'El cierre definitivo acredita premios y Elo una sola vez y bloquea la edición y cancelación ordinarias. Revisá los resultados antes de continuar.');
+    const handleGenerateBracket = () => action('bracket', () => request(`/tournaments/${id}/bracket`, {method:'POST'}), 'Al iniciar se requiere cupo completo: si faltan participantes el backend cancela el torneo y devuelve los puntos. ¿Procesar ahora?');
+    const handleDisqualify = participant => {
+        const reason = window.prompt(`Motivo de descalificación de ${participant.username}:`, '');
+        if (reason !== null) return action(`disqualify:${participant.userId}`, () => request(`/tournaments/${id}/participants/${participant.userId}/disqualify`, {method:'POST',data:{reason}}));
     };
-
-    const refreshAll = () => {
-        fetchTournament();
-        fetchMatches();
-        fetchUserTeams();
-    };
-
-    useEffect(() => {
-        refreshAll();
-    }, [id]);
-
-    // El backend devuelve las llaves completas después de cada acción del moderador.
-    // Se actualizan al instante y se recarga el torneo (por si pasó a "Finalizado").
-    const handleMatchesUpdated = (updatedMatches) => {
-        setMatches(updatedMatches);
-        fetchTournament();
-    };
-
-    const handleSessionExpired = () => {
-        localStorage.removeItem('user');
-        alert('Tu sesión expiró. Volvé a iniciar sesión.');
-        navigate('/login');
-    };
-
-    const handleRegister = async () => {
-        if (!user) {
-            alert('Tenés que iniciar sesión para inscribirte.');
-            navigate('/login');
-            return;
-        }
-
-        setRegistering(true);
-        try {
-            const response = await apiFetch(`/tournaments/${id}/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    userId: user.id,
-                    username: user.username,
-                    inGameName: user.username,
-                    rank: 'N/A',
-                    registeredAt: new Date().toISOString()
-                })
-            });
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al inscribirse (${response.status})`);
-            }
-
-            alert('¡Inscripción exitosa!');
-            fetchTournament();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setRegistering(false);
-        }
-    };
-
-    const handleRegisterTeam = async (teamId) => {
-        if (!user) {
-            alert('Tenés que iniciar sesión para inscribirte.');
-            navigate('/login');
-            return;
-        }
-
-        setRegisteringTeam(true);
-        try {
-            const response = await apiFetch(`/tournaments/${id}/register-team`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ teamId })
-            });
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al inscribir equipo (${response.status})`);
-            }
-
-            alert('¡Equipo inscripto exitosamente!');
-            fetchTournament();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setRegisteringTeam(false);
-        }
-    };
-
-    const handleGenerateBracket = async () => {
-        const confirmed = window.confirm(
-            '¿Generar las llaves ahora? Se cerrarán las inscripciones y no se puede deshacer.'
-        );
-        if (!confirmed) return;
-
-        setGenerating(true);
-        try {
-            const response = await apiFetch(`/tournaments/${id}/bracket`, {
-                method: 'POST'
-            });
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-            if (response.status === 403) {
-                throw new Error('Solo los moderadores pueden generar las llaves.');
-            }
-
-            const text = await response.text();
-            let data = null;
-            try {
-                data = text ? JSON.parse(text) : null;
-            } catch {
-                data = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al generar las llaves (${response.status})`);
-            }
-
-            refreshAll();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setGenerating(false);
-        }
-    };
-
-    const handleDisqualify = async (participant) => {
-        const reason = window.prompt(
-            `Vas a descalificar a ${participant.username}.\nMotivo (opcional):`,
-            ''
-        );
-        // Si cancela el cuadro, no se descalifica
-        if (reason === null) return;
-
-        setDisqualifyingId(participant.userId);
-        try {
-            const response = await apiFetch(
-                `/tournaments/${id}/participants/${participant.userId}/disqualify`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reason })
-                }
-            );
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-            if (response.status === 403) {
-                throw new Error('Solo los moderadores pueden descalificar jugadores.');
-            }
-
-            const text = await response.text();
-            let data = null;
-            try {
-                data = text ? JSON.parse(text) : null;
-            } catch {
-                data = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al descalificar (${response.status})`);
-            }
-
-            refreshAll();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setDisqualifyingId(null);
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!user) {
-            alert('Tenés que iniciar sesión para eliminar torneos.');
-            navigate('/login');
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `¿Seguro que querés eliminar el torneo "${tournament.title}"? Esta acción no se puede deshacer.`
-        );
-        if (!confirmed) return;
-
-        setDeleting(true);
-        try {
-            const response = await apiFetch(`/tournaments/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (response.status === 401) {
-                handleSessionExpired();
-                return;
-            }
-            if (response.status === 403) {
-                throw new Error('No tenés permisos para eliminar este torneo.');
-            }
-
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : null;
-
-            if (!response.ok) {
-                throw new Error(data?.message || `Error al eliminar (${response.status})`);
-            }
-
-            alert('Torneo eliminado con éxito.');
-            navigate('/tournaments');
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setDeleting(false);
-        }
-    };
-
+    const handleMatchesUpdated = () => { void load(); };
     if (loading) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
-    if (error) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-red-400">Error: {error}</div>;
+    if (error) return <div role="alert" className="p-6 text-red-400">{error}<button className="ml-4 underline" onClick={load}>Reintentar</button></div>;
     if (!tournament) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Torneo no encontrado.</div>;
 
-    const isAlreadyRegistered = user
-        ? tournament.participants.some(p => p.userId === user.id)
-        : false;
-
-    const isAlreadyRegisteredAsTeam = user
-        ? tournament.participants.some(p => p.teamId && userTeams.some(t => t.id === p.teamId))
-        : false;
-
-    // Las inscripciones se cierran cuando el torneo deja de estar en "Próximo"
-    const registrationClosed = tournament.status !== 'Próximo';
-    const now = new Date();
-    const start = tournament.startDate ? new Date(tournament.startDate) : null;
-    const registrationNotOpenYet = start ? now < new Date(start.getTime() - 30 * 60 * 1000) : false;
-
-    // Los resultados se cargan mientras el torneo está en juego (o para corregir la final)
-    const canManageResults = isModerator && (tournament.status === 'En curso' || tournament.status === 'Finalizado');
-
-    // Se puede descalificar antes de empezar y durante el torneo, no cuando ya terminó
-    const canDisqualify = isModerator && (tournament.status === 'Próximo' || tournament.status === 'En curso');
-
+    const isAlreadyRegistered = tournament.participants.some(p => p.userId === user?.id);
+    const phase = registrationState(tournament, now);
+    const registrationClosed = phase !== 'open';
+    const canManageResults = canEditTournament(tournament, isModerator);
+    const canDisqualify = isModerator && !tournament.closedAt && ['Próximo', 'En curso'].includes(tournament.status);
+    const canCancelTournament = isModerator && !tournament.closedAt && tournament.status !== 'Cancelado';
     const disqualifiedIds = tournament.participants
         .filter(p => p.isDisqualified)
         .map(p => p.userId);
@@ -350,11 +82,11 @@ export default function TournamentDetailPage() {
                     <div className="flex flex-col items-start md:items-end gap-4 w-full md:w-auto">
                         <div className="text-left md:text-right">
                             <span className="text-xs text-gray-400 block">Pozo de Premios</span>
-                            <span className="text-3xl font-extrabold text-emerald-400">€{tournament.prizePool}</span>
+                            <span className="text-3xl font-extrabold text-emerald-400">{tournament.isFree ? "Participación válida" : points(tournament.prizePool)}</span>
                         </div>
 
                         <div className="flex flex-col gap-2 w-full md:w-auto">
-                            <button
+                            {tournament.tournamentType === "Individual" && <button
                                 onClick={handleRegister}
                                 disabled={isAlreadyRegistered || registrationClosed || registering}
                                 className={`w-full md:w-auto px-6 py-3 rounded-lg font-bold transition shadow-lg ${
@@ -369,21 +101,27 @@ export default function TournamentDetailPage() {
                                         ? 'Inscripciones cerradas'
                                         : registering
                                             ? 'Inscribiendo...'
-                                            : 'Inscribirse al Torneo'}
-                            </button>
-
-                            {canDelete && (
+                                            : `Inscribirme · ${tournament.isFree ? 'Gratis' : points(tournament.entryPoints)}`}
+                            </button>}
+                            {tournament.tournamentType === "Equipo" && userTeams.filter(t => t.captainId === user?.id && t.gameName === tournament.gameName).map(team => <button key={team.id} disabled={registrationClosed || Boolean(busy) || enrollments.some(e => e.teamId === team.id && e.status !== "Cancelled")} onClick={() => handleRegisterTeam(team.id)} className="rounded-lg bg-purple-600 px-4 py-3 font-bold disabled:opacity-50">Solicitar con {team.name} · mi entrada {tournament.isFree ? "gratis" : points(tournament.entryPoints)}</button>)}
+                            {tournament.tournamentType === "Equipo" && !userTeams.some(t => t.captainId === user?.id && t.gameName === tournament.gameName) && <p className="max-w-sm text-sm text-gray-400">El capitán debe solicitar la inscripción. Después, cada uno de los cinco titulares confirma su presencia.</p>}
+                            <p className="text-sm text-gray-400">{phase === "early" ? "Las inscripciones abren 30 minutos antes del inicio." : phase === "full" ? "Cupo completo." : phase === "closed" ? "Inscripciones cerradas." : "Inscripción abierta."}</p>
+                            {canCancelTournament && (
                                 <button
-                                    onClick={handleDelete}
-                                    disabled={deleting}
+                                    onClick={handleCancelTournament}
+                                    disabled={cancelling}
                                     className="w-full md:w-auto px-6 py-3 rounded-lg font-bold transition border border-red-800 text-red-400 hover:bg-red-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {deleting ? 'Eliminando...' : 'Eliminar Torneo'}
+                                    {cancelling ? 'Cancelando...' : 'Cancelar torneo y devolver puntos'}
                                 </button>
                             )}
+                            {isModerator && tournament.status === 'Finalizado' && !tournament.closedAt && <button disabled={Boolean(busy)} onClick={handleClose} className="rounded-lg border border-emerald-700 px-4 py-3 font-bold text-emerald-300 disabled:opacity-50">Cerrar definitivamente y liquidar premios / Elo</button>}
                         </div>
                     </div>
                 </div>
+                {actionError && <p role="alert" className="mb-4 text-red-300">{actionError}</p>}
+                <TournamentEconomy tournament={tournament} />
+                {enrollments.length > 0 && <div className="mb-6 space-y-3"><h2 className="text-xl font-bold">Mis solicitudes en este torneo</h2>{enrollments.map(item => <EnrollmentCard key={item.id} item={{...item, isFree:tournament.isFree,entryPoints:tournament.entryPoints}} userId={user?.id} busy={Boolean(busy)} confirmationOpen={phase === "open"} frozen={Boolean(tournament.closedAt) || tournament.status==='Cancelado'} onConfirm={handleConfirm} onCancel={handleCancelRequest} />)}</div>}
 
                 {/* Grid de Secciones (Reglas y Participantes) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -475,7 +213,7 @@ export default function TournamentDetailPage() {
                         {isModerator && matches.length === 0 && tournament.status === 'Próximo' && (
                             <button
                                 onClick={handleGenerateBracket}
-                                disabled={generating || tournament.participants.filter(p => !p.isDisqualified).length < 2}
+                                disabled={generating || new Date(tournament.startDate).getTime() > now}
                                 className="px-4 py-2 rounded-lg font-bold text-sm transition bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {generating ? 'Generando...' : 'Generar llaves ahora'}
@@ -485,8 +223,8 @@ export default function TournamentDetailPage() {
 
                     {matches.length === 0 ? (
                         <p className="text-gray-500 text-sm text-center py-8">
-                            {tournament.participants.filter(p => !p.isDisqualified).length < 2
-                                ? 'Se necesitan al menos 2 inscritos para generar las llaves.'
+                            {new Date(tournament.startDate).getTime() > now
+                                ? 'Las llaves se generan al iniciar. Se requieren ocho participantes; si faltan se cancela y reembolsa.'
                                 : `Las llaves se generan automáticamente cuando comienza el torneo${startDateText ? ` (${startDateText})` : ''}.`}
                         </p>
                     ) : (
@@ -494,6 +232,7 @@ export default function TournamentDetailPage() {
                             matches={matches}
                             currentUserId={user?.id}
                             canManage={canManageResults}
+                            closedAt={tournament.closedAt}
                             gameName={tournament.gameName}
                             disqualifiedIds={disqualifiedIds}
                             onMatchesUpdated={handleMatchesUpdated}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from '../../routing/navigation';
 import { apiFetch } from '../../config';
+import CurrentEloPanel from '../../components/rankings/CurrentEloPanel';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -20,9 +21,12 @@ const ProfilePage = () => {
   const [gameForm, setGameForm] = useState({ gameName: 'League of Legends', inGameName: '', rank: '' });
   const [isEditingGame, setIsEditingGame] = useState(false);
 
-  const fetchProfileAndTeam = async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchProfileAndTeam = async () => {
     try {
-      const profileResponse = await apiFetch('/profile/me');
+      const profileResponse = await apiFetch('/profile/me', { signal: controller.signal });
+      if (controller.signal.aborted) return;
 
       if (profileResponse.status === 401) {
         localStorage.removeItem('user');
@@ -35,6 +39,7 @@ const ProfilePage = () => {
       }
 
       const profileData = await profileResponse.json();
+      if (controller.signal.aborted) return;
       setProfile(profileData);
 
       setStatsForm({
@@ -44,10 +49,11 @@ const ProfilePage = () => {
       });
       setAvatarUrlInput(profileData.avatarUrl || '');
 
-      const teamsResponse = await apiFetch('/teams');
+      const teamsResponse = await apiFetch('/teams', { signal: controller.signal });
 
       if (teamsResponse.ok) {
         const teamsData = await teamsResponse.json();
+        if (controller.signal.aborted) return;
         const foundTeam = teamsData.find(team => 
           team.members?.some(m => m.userId === profileData.id || m.UserId === profileData.id || m.username === profileData.username)
         );
@@ -55,15 +61,14 @@ const ProfilePage = () => {
       }
 
     } catch (err) {
-      setError(err.message);
+      if (!controller.signal.aborted) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchProfileAndTeam();
-  }, []);
+    };
+    Promise.resolve().then(fetchProfileAndTeam);
+    return () => controller.abort();
+  }, [navigate]);
 
   // Actualizar Estadísticas y Avatar
   const handleUpdateProfile = async (e) => {
@@ -209,6 +214,8 @@ const ProfilePage = () => {
           </button>
         </div>
       </header>
+
+      <CurrentEloPanel kind="players" entityId={profile?.id} games={profile?.games ?? []} />
 
       {/* Panel de Edición Desplegable */}
       {isEditing && (

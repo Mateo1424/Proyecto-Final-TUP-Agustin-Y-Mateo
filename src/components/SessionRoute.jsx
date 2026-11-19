@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Redirect } from 'wouter';
+import { useSessionStore } from '../store/session.js';
 import LoadingScreen from './layout/LoadingScreen';
 import { fetchCurrentUser } from '../utils/session.js';
 
-export default function SessionRoute({ authenticated }) {
+export default function SessionRoute({ authenticated, children }) {
   const [session, setSession] = useState({ loading: true, user: null, error: false });
 
   useEffect(() => {
@@ -15,22 +16,23 @@ export default function SessionRoute({ authenticated }) {
         const user = await fetchCurrentUser(controller.signal);
         if (ignore) return;
 
-        localStorage.removeItem('token');
-        if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
-          localStorage.setItem('username', user.username);
-        } else {
-          localStorage.removeItem('user');
-          localStorage.removeItem('username');
-        }
+        useSessionStore.getState().accept(user);
         setSession({ loading: false, user, error: false });
       } catch {
         if (!ignore) setSession({ loading: false, user: null, error: true });
       }
     }
 
+    function expired() {
+      ignore = true;
+      controller.abort();
+      useSessionStore.getState().accept(null);
+      setSession({ loading: false, user: null, error: false });
+    }
+    window.addEventListener('session-expired', expired);
     restoreSession();
     return () => {
+      window.removeEventListener('session-expired', expired);
       ignore = true;
       controller.abort();
     };
@@ -48,7 +50,7 @@ export default function SessionRoute({ authenticated }) {
     );
   }
 
-  if (authenticated && !session.user) return <Navigate to="/login" replace />;
-  if (!authenticated && session.user) return <Navigate to="/dashboard" replace />;
-  return <Outlet />;
+  if (authenticated && !session.user) return <Redirect to="/login" replace />;
+  if (!authenticated && session.user) return <Redirect to="/dashboard" replace />;
+  return children;
 }

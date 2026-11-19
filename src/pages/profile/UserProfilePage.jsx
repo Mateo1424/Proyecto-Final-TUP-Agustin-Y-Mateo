@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from '../../routing/navigation';
 import { apiFetch } from '../../config';
+import CurrentEloPanel from '../../components/rankings/CurrentEloPanel';
+import { getStoredUser } from '../../utils/Roles';
 
 const UserProfilePage = () => {
   const { id } = useParams();
@@ -12,18 +14,20 @@ const UserProfilePage = () => {
 
   useEffect(() => {
     // Si el perfil pedido es el propio, llevamos a "Mi Perfil" (que permite editar)
-    const storedUser = localStorage.getItem('user');
-    const currentUser = storedUser ? JSON.parse(storedUser) : null;
+    const currentUser = getStoredUser();
     if (currentUser && currentUser.id === id) {
       navigate('/profile', { replace: true });
       return;
     }
 
+    const controller = new AbortController();
     const fetchUserProfile = async () => {
+      if (controller.signal.aborted) return;
       setLoading(true);
       setError('');
       try {
-        const response = await apiFetch(`/profile/${id}`);
+        const response = await apiFetch(`/profile/${id}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
 
         if (response.status === 401) {
           localStorage.removeItem('user');
@@ -38,28 +42,31 @@ const UserProfilePage = () => {
         }
 
         const data = await response.json();
+        if (controller.signal.aborted) return;
         setProfile(data);
 
         // Equipo del usuario (la lista de equipos es pública)
-        const teamsResponse = await apiFetch('/teams');
+        const teamsResponse = await apiFetch('/teams', { signal: controller.signal });
         if (teamsResponse.ok) {
           const teamsData = await teamsResponse.json();
+          if (controller.signal.aborted) return;
           const foundTeam = teamsData.find(team =>
             team.members?.some(m => m.userId === data.id || m.UserId === data.id)
           );
           setUserTeam(foundTeam || null);
         }
       } catch (err) {
-        setError(err.message);
+        if (!controller.signal.aborted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    fetchUserProfile();
-  }, [id]);
+    Promise.resolve().then(fetchUserProfile);
+    return () => controller.abort();
+  }, [id, navigate]);
 
-  if (loading) return <div className="p-8 text-white">Cargando perfil...</div>;
+  if (loading || (!error && profile && profile.id !== id)) return <div className="p-8 text-white">Cargando perfil...</div>;
   if (error) {
     return (
       <div className="p-8 space-y-4">
@@ -127,6 +134,8 @@ const UserProfilePage = () => {
           </div>
         </div>
       </header>
+
+      <CurrentEloPanel kind="players" entityId={profile?.id} games={profile?.games ?? []} />
 
       {/* Grid de Secciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

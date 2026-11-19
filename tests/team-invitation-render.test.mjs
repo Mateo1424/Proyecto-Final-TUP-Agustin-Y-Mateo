@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createServer } from 'vite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MemoryRouter } from 'react-router-dom';
+import { Router } from 'wouter';
 import { fileURLToPath } from 'node:url';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -28,7 +28,7 @@ test('los controles renderizados respetan destinatario, capitán y estados termi
       status: 'Pending', expiresAt: '2099-01-01T00:00:00Z',
     };
     function render(overrides = {}, sent = false, busy = '') {
-      return renderToStaticMarkup(createElement(MemoryRouter, null,
+      return renderToStaticMarkup(createElement(Router, { ssrPath: "/" },
         createElement(InvitationList, { invitations: [{ ...invitation, ...overrides }], sent, busy, onAction() {} })));
     }
     const received = render();

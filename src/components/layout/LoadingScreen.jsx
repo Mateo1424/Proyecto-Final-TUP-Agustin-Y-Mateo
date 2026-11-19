@@ -1,5 +1,3 @@
-import React from 'react';
-
 // Pantalla de carga estilo teclado: cinco "teclas" que se encienden en secuencia
 export default function LoadingScreen({ fullScreen = true, text = 'Cargando' }) {
   return (

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { apiFetch, GOOGLE_LOGIN_URL } from '../config';
+import { useNavigate, Link, useSearchParams } from '../routing/navigation';
+import { GOOGLE_LOGIN_URL } from '../config';
+import { request } from '../api/client';
+import { useSchemaForm } from '../hooks/useSchemaForm';
+import { loginSchema } from '../schemas/auth';
+import { useSessionStore } from '../store/session';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(() => {
     const err = searchParams.get('error');
@@ -14,40 +16,13 @@ const LoginPage = () => {
       : 'Error al iniciar sesión con Google. Intentá nuevamente.';
   });
   const navigate = useNavigate();
+  const { register, submit, formState: { errors, isSubmitting } } = useSchemaForm(loginSchema, { email: '', password: '' });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleLogin = submit(async values => {
     setError('');
-
-    try {
-      const response = await apiFetch('/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Credenciales inválidas.');
-      }
-
-      const data = await response.json();
-
-      // El token viaja en una cookie HttpOnly; acá solo guardamos los datos del usuario
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('username', data.user.username);
-      }
-      localStorage.removeItem('token'); // limpieza del esquema anterior
-
-      navigate('/dashboard');
-
-    } catch (err) {
-      setError(err.message || 'Credenciales inválidas o error de conexión con el servidor.');
-    }
-  };
+    try { const data = await request('/auth/login', { method: 'POST', data: values }); useSessionStore.getState().accept(data.user); navigate('/dashboard'); }
+    catch (failure) { setError(failure.message); }
+  });
 
   return (
     <div className="min-h-screen bg-[#0d1117] text-white flex items-center justify-center p-4">
@@ -67,13 +42,13 @@ const LoginPage = () => {
         )}
 
         {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form noValidate onSubmit={handleLogin} className="space-y-4">
+          {Object.entries(errors).map(([field, error]) => <p key={field} role="alert" className="text-sm text-red-300">{error.message}</p>)}
           <div>
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Correo Electrónico</label>
             <input 
               type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register('email')}
               placeholder="tu@correo.com"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -84,8 +59,7 @@ const LoginPage = () => {
             <label className="block text-xs font-medium text-gray-300 uppercase mb-1">Contraseña</label>
             <input 
               type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...register('password')}
               placeholder="••••••••"
               className="w-full bg-[#0d1117] border border-gray-800 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition"
               required
@@ -93,7 +67,7 @@ const LoginPage = () => {
           </div>
 
           <button 
-            type="submit"
+            type="submit" disabled={isSubmitting}
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition text-sm mt-2 shadow-lg shadow-purple-900/20"
           >
             Iniciar Sesión
