@@ -13,7 +13,7 @@ const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProfilePage = lazy(() => import('../pages/profile/ProfilePage'));
 const UserProfilePage = lazy(() => import('../pages/profile/UserProfilePage'));
 const TournamentsPage = lazy(() => import('../pages/Tournaments/TournamentsPage'));
-const TournamentDetailPage = lazy(() => import('../pages/Tournaments/TournamentDetailsPage'));
+const TournamentDetailPage = lazy(() => import('../pages/Tournaments/TournamentDetailsModal'));
 const CreateTournament = lazy(() => import('../pages/Tournaments/CreateTournament'));
 const MatchDetailPage = lazy(() => import('../pages/Tournaments/MatchDetailsPage'));
 const TeamsPage = lazy(() => import('../pages/team/TeamsPage'));

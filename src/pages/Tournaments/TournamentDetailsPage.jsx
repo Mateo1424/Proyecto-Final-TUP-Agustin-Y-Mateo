@@ -9,13 +9,21 @@ import { useTournamentDetails } from '../../hooks/useTournamentDetails.js';
 import EnrollmentCard from '../../components/tournaments/EnrollmentCard.jsx';
 import TournamentEconomy from '../../components/tournaments/TournamentEconomy.jsx';
 import TournamentBracket from './TournamentBracket';
+import DeleteTournament from '../../components/tournaments/DeleteTournament.jsx';
 
-export default function TournamentDetailPage() {
+export default function TournamentDetailPage({ onClose }) {
     const { id } = useParams();
     const navigate = useNavigate();
     const user = getStoredUser();
     const isModerator = checkModerator(user);
     const { tournament, matches, teams: userTeams, enrollments, loading, error, busy, now, load, mutate } = useTournamentDetails(id, user?.id);
+    if (loading) return <p role="status" className="p-6 text-white">Cargando detalles...</p>;
+    if (error) return <div role="alert" className="p-6 text-red-400">{error}<button className="ml-4 underline" onClick={load}>Reintentar</button></div>;
+    if (!tournament) return <p className="p-6 text-white">Torneo no encontrado.</p>;
+    return <TournamentContent {...{ tournament, matches, userTeams, enrollments, busy, now, load, mutate, id, navigate, user, isModerator, onClose }} />;
+}
+
+function TournamentContent({ tournament, matches, userTeams, enrollments, busy, now, load, mutate, id, navigate, user, isModerator, onClose }) {
     const [actionError, setActionError] = useState('');
     const registering = busy === 'register';
     const cancelling = busy === 'cancel';
@@ -41,9 +49,6 @@ export default function TournamentDetailPage() {
         if (reason !== null) return action(`disqualify:${participant.userId}`, () => request(`/tournaments/${id}/participants/${participant.userId}/disqualify`, {method:'POST',data:{reason}}));
     };
     const handleMatchesUpdated = () => { void load(); };
-    if (loading) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Cargando detalles...</div>;
-    if (error) return <div role="alert" className="p-6 text-red-400">{error}<button className="ml-4 underline" onClick={load}>Reintentar</button></div>;
-    if (!tournament) return <div className="flex justify-center items-center h-screen bg-[#0d1117] text-white">Torneo no encontrado.</div>;
 
     const isAlreadyRegistered = tournament.participants.some(p => p.userId === user?.id);
     const phase = registrationState(tournament, now);
@@ -63,7 +68,7 @@ export default function TournamentDetailPage() {
         <div className="p-6 bg-[#0d1117] min-h-screen text-white">
             <div className="max-w-7xl mx-auto">
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => onClose ? onClose() : navigate('/tournaments')}
                     className="text-sm text-purple-400 hover:underline mb-6 flex items-center gap-1"
                 >
                     ← Volver a torneos
@@ -116,6 +121,7 @@ export default function TournamentDetailPage() {
                                 </button>
                             )}
                             {isModerator && tournament.status === 'Finalizado' && !tournament.closedAt && <button disabled={Boolean(busy)} onClick={handleClose} className="rounded-lg border border-emerald-700 px-4 py-3 font-bold text-emerald-300 disabled:opacity-50">Cerrar definitivamente y liquidar premios / Elo</button>}
+                            {isModerator && !tournament.closedAt && <DeleteTournament tournament={tournament} disabled={Boolean(busy)} onDeleted={() => onClose ? onClose() : navigate('/tournaments', { replace: true })} />}
                         </div>
                     </div>
                 </div>

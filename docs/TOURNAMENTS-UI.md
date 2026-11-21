@@ -1,5 +1,16 @@
 # Tournament points and enrollment UI
 
+## Details dialog correction
+
+Tournament detail routes now show a native modal over the list. Close/Escape
+return to the list; browser Back also recovers without reload. Loading/error
+states live outside TournamentContent: React Compiler may inspect callback
+dependencies before an early return, so callbacks must never receive a null
+tournament. The previous null entryPoints crash was reproduced in a browser with
+isolated mocked responses, then the same open/Back/reopen/Escape flow passed.
+No database was changed. A compiler-enabled SSR regression covers initial loading
+and the dialog close action.
+
 Existing tournament list, details, create, bracket and match-detail pages preserve
 their established layout and styles. All tournament routes use the shared Wouter
 navigation adapter. Only the new personal inbox adopts the prototype's scoped

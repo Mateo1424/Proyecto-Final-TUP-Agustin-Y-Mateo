@@ -3,6 +3,7 @@ import { useNavigate } from '../../routing/navigation.js';
 import { request, isAborted } from '../../api/client.js';
 import { points } from '../../utils/format.js';
 import { getStoredUser, isModerator } from '../../utils/Roles';
+import { visibleTournaments } from '../../utils/visibleTournaments.js';
 
 export default function TournamentsPage() {
     const [tournaments, setTournaments] = useState([]);
@@ -15,7 +16,7 @@ export default function TournamentsPage() {
 
     useEffect(() => {
         const abort = new AbortController();
-        request('/tournaments', { signal: abort.signal }).then(data => { if(!abort.signal.aborted) { setTournaments(data); setLoading(false); } }).catch(failure => { if(!isAborted(failure)) { setError(failure.message); setLoading(false); } });
+        request('/tournaments', { signal: abort.signal }).then(data => { if(!abort.signal.aborted) { setTournaments(visibleTournaments(data)); setLoading(false); } }).catch(failure => { if(!isAborted(failure)) { setError(failure.message); setLoading(false); } });
         return () => abort.abort();
     }, []);
 
