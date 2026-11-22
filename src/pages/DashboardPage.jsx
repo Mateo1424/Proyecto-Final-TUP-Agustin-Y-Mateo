@@ -1,96 +1,62 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from '../routing/navigation.js';
+import { request } from '../api/client.js';
+import { GAMES, getCurrentElo } from '../api/rankings.js';
+import { getMyEnrollments } from '../api/tournaments.js';
+import { useEloRequest } from '../hooks/useEloRequest.js';
+import { useSessionStore } from '../store/session.js';
+import { useWalletStore } from '../store/wallet.js';
+import { ActivityPreview, EloValue, ResourceState, WalletSummary } from '../components/dashboard/DashboardSections.jsx';
+import './dashboard.css';
 
-const DashboardPage = () => {
-  const [username] = useState(() => localStorage.getItem('username') || 'Usuario');
+const loadProfile = signal => request('/profile/me', { signal });
+const loadInvitations = signal => request('/team-invitations', { signal });
+const loadPending = signal => getMyEnrollments({ status: 'Pending', page: 1, pageSize: 6 }, signal);
+const loadAdmitted = signal => getMyEnrollments({ status: 'Admitted', page: 1, pageSize: 6 }, signal);
 
+function GameSummary({ userId, game }) {
+  const load = useCallback(signal => getCurrentElo('players', userId, game, signal), [userId, game]);
+  const current = useEloRequest(load, `${userId}:${game}`);
+  return <li><h3>{game}</h3><ResourceState resource={current}><EloValue current={current.data} /></ResourceState></li>;
+}
 
-  // Extraemos la primera letra para el avatar dinámico
-  const userInitial = username ? username.charAt(0).toUpperCase() : 'U';
+export default function DashboardPage() {
+  const user = useSessionStore(state => state.user);
+  const wallet = useWalletStore();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const profile = useEloRequest(loadProfile, `${user?.id}:profile`);
+  const invitations = useEloRequest(loadInvitations, `${user?.id}:invitations`);
+  const pending = useEloRequest(loadPending, `${user?.id}:pending`);
+  const admitted = useEloRequest(loadAdmitted, `${user?.id}:admitted`);
+  const games = GAMES.filter(game => profile.data?.games?.some(value => value.gameName?.trim().toLowerCase() === game.toLowerCase()));
 
-  return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* Cabecera del Dashboard */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#161b22] p-6 rounded-xl border border-gray-800">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Buenas noches, {username}</h1>
-          <p className="text-gray-400 text-sm mt-1">Tu próxima victoria empieza aquí.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-[#0d1117] px-4 py-2 rounded-lg border border-gray-800 flex items-center gap-2">
-            <span className="text-purple-400 font-mono font-semibold">2,840 RP</span>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white uppercase">
-            {userInitial}
-          </div>
-        </div>
-      </header>
-
-      {/* Contenido Principal en Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Columna Principal Izquierda (Torneo Destacado y Actividad) */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Torneo Destacado */}
-          <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-6xl text-purple-500 pointer-events-none">
-              ARENA
-            </div>
-            <span className="text-xs uppercase tracking-wider text-purple-400 font-semibold bg-purple-950/50 px-3 py-1 rounded-full border border-purple-800/50">
-              Destacado
-            </span>
-            <h2 className="text-xl font-bold text-white mt-4">Nexus Masters: Circuito Nocturno</h2>
-            <p className="text-gray-400 text-sm mt-2">
-              Compite en el circuito nocturno de divisiones y escala puestos en el ranking de la comunidad.
-            </p>
-            <button className="mt-6 bg-purple-600 hover:bg-purple-700 text-white font-medium px-5 py-2.5 rounded-lg transition text-sm">
-              Ver Detalles del Torneo
-            </button>
-          </section>
-
-          {/* Mis Torneos Activos */}
-          <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Mis Torneos Activos</h3>
-            <div className="space-y-3">
-              {/* Ejemplo de item de torneo */}
-              <div className="bg-[#0d1117] p-4 rounded-lg border border-gray-800/80 flex justify-between items-center">
-                <div>
-                  <h4 className="font-medium text-white text-sm">Copa de Invocador #24</h4>
-                  <p className="text-xs text-gray-400 mt-0.5">Reg. 01/02 • En Play-offs</p>
-                </div>
-                <span className="text-xs bg-emerald-950/80 text-emerald-400 px-2.5 py-1 rounded border border-emerald-800/50">
-                  Activo
-                </span>
-              </div>
-            </div>
-          </section>
-
-        </div>
-
-        {/* Columna Secundaria Derecha (Estadísticas / Accesos Rápidos) */}
-        <div className="space-y-6">
-          <section className="bg-[#161b22] rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Resumen Rápido</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b border-gray-800/60">
-                <span className="text-gray-400 text-sm">Escuadra Competitiva</span>
-                <span className="text-white text-sm font-medium">Void Runners</span>
-              </div>
-              <div className="flex justify-between items-center pb-3 border-b border-gray-800/60">
-                <span className="text-gray-400 text-sm">Partidos Jugados</span>
-                <span className="text-white text-sm font-medium">144</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-sm">Winrate Global</span>
-                <span className="text-purple-400 text-sm font-semibold">71%</span>
-              </div>
-            </div>
-          </section>
-        </div>
-
+  return <div className="arena-dashboard">
+    <header className="arena-page-heading">
+      <div><p className="arena-eyebrow">Tu actividad</p><h1 className="arena-title">Hola, {user?.username ?? 'jugador'}</h1><p className="arena-muted">Tus próximas acciones, torneos y clasificación en un solo lugar.</p></div>
+      <Link to="/tournaments" className="arena-button arena-button-primary">Buscar torneos</Link>
+    </header>
+    <div className="arena-dashboard-columns">
+      <div className="arena-dashboard-activity">
+        <ActivityPreview kind="pending" resource={pending} userId={user?.id} now={now} />
+        <ActivityPreview kind="invitations" resource={invitations} now={now} />
+        <ActivityPreview kind="active" resource={admitted} now={now} />
+        <div className="arena-dashboard-explore"><p className="arena-muted">¿Buscás tu próxima competencia?</p><Link to="/tournaments" className="arena-detail-link">Explorar torneos</Link><Link to="/teams" className="arena-detail-link">Buscar un equipo</Link></div>
+      </div>
+      <div className="arena-dashboard-summary">
+        <WalletSummary {...wallet} onRetry={wallet.refresh} />
+        <section className="arena-dashboard-panel">
+          <p className="arena-eyebrow">Competitivo</p><h2>Mi Elo por juego</h2>
+          <p className="arena-muted">Se actualiza con los resultados elegibles. No es tu saldo de recompensas.</p>
+          <ResourceState resource={profile}>
+            {games.length && user?.id ? <ul className="arena-activity-list">{games.map(game => <GameSummary key={`${user.id}:${game}`} userId={user.id} game={game} />)}</ul> : <p className="arena-muted">No tenés juegos compatibles asociados. Agregalos en tu perfil para consultar tu Elo.</p>}
+          </ResourceState>
+          <div className="flex flex-wrap gap-x-5"><Link to="/profile" className="arena-detail-link">Ver mi perfil</Link><Link to="/rankings" className="arena-detail-link">Ver rankings</Link></div>
+        </section>
       </div>
     </div>
-  );
-};
-
-export default DashboardPage;
+  </div>;
+}

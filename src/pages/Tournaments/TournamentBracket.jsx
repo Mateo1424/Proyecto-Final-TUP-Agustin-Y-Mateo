@@ -12,7 +12,7 @@ const roundName = (round, totalRounds) => {
 };
 
 const smallBtn =
-    'w-6 h-6 flex items-center justify-center rounded border text-xs font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+    'detail-score-button w-6 h-6 flex items-center justify-center rounded border text-xs font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 
 function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, isDisqualified, manage }) {
     return (
@@ -44,6 +44,7 @@ function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, is
                         disabled={manage.busy}
                         onClick={() => manage.onScore(-1)}
                         title="Restar uno"
+                        aria-label={`Restar uno a ${player?.username}`}
                         className={`${smallBtn} border-gray-700 text-gray-300 hover:bg-gray-800/60`}
                     >
                         −
@@ -54,6 +55,7 @@ function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, is
                         disabled={manage.busy}
                         onClick={() => manage.onScore(1)}
                         title="Sumar uno"
+                        aria-label={`Sumar uno a ${player?.username}`}
                         className={`${smallBtn} border-gray-700 text-gray-300 hover:bg-gray-800/60`}
                     >
                         +
@@ -66,6 +68,7 @@ function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, is
                         disabled={manage.busy}
                         onClick={manage.onWin}
                         title="Gana el partido y avanza"
+                        aria-label={`Declarar ganador a ${player?.username}`}
                         className={`${smallBtn} border-emerald-700 text-emerald-400 hover:bg-emerald-950/40`}
                     >
                         ✓
@@ -75,6 +78,7 @@ function PlayerRow({ player, score, isWinner, isEliminated, isMe, emptyLabel, is
                         disabled={manage.busy}
                         onClick={manage.onLose}
                         title="Pierde: avanza el rival"
+                        aria-label={`Declarar perdedor a ${player?.username}`}
                         className={`${smallBtn} border-red-800 text-red-400 hover:bg-red-950/50`}
                     >
                         ✕
@@ -104,17 +108,18 @@ function ResultEditor({ match, busy, onClose, onSubmit }) {
     return (
         <div className="border-t border-gray-800/80 p-3 space-y-3 bg-black/30">
             <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-gray-300">{match.playerA.username}</span>
-                <input type="number" min={0} value={scoreA} onChange={e => setScoreA(e.target.value)} className={inputClass} />
+                <label htmlFor={`score-a-${match.id}`} className="truncate text-gray-300">{match.playerA.username}</label>
+                <input id={`score-a-${match.id}`} type="number" min={0} value={scoreA} onChange={e => setScoreA(e.target.value)} className={inputClass} />
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-gray-300">{match.playerB.username}</span>
-                <input type="number" min={0} value={scoreB} onChange={e => setScoreB(e.target.value)} className={inputClass} />
+                <label htmlFor={`score-b-${match.id}`} className="truncate text-gray-300">{match.playerB.username}</label>
+                <input id={`score-b-${match.id}`} type="number" min={0} value={scoreB} onChange={e => setScoreB(e.target.value)} className={inputClass} />
             </div>
 
             <div>
-                <label className="block text-[11px] text-gray-400 mb-1">Ganador</label>
+                <label htmlFor={`winner-${match.id}`} className="block text-[11px] text-gray-400 mb-1">Ganador</label>
                 <select
+                    id={`winner-${match.id}`}
                     value={winnerId}
                     onChange={e => setWinnerId(e.target.value)}
                     style={{ colorScheme: 'dark' }}
@@ -237,14 +242,14 @@ export default function TournamentBracket({
     return (
         <div className="space-y-4">
             {champion && (
-                <div className="text-center py-3 rounded-lg border border-amber-800/40 bg-amber-950/30">
+                <div className="detail-champion text-center py-3 rounded-lg border border-amber-800/40 bg-amber-950/30">
                     <span className="text-xs uppercase tracking-wider text-amber-400/80 block">Campeón</span>
                     <span className="text-xl font-extrabold text-amber-300">🏆 {champion.username}</span>
                 </div>
             )}
 
             {manage && (
-                <div className="text-xs text-gray-400 border border-gray-800/80 rounded-lg px-3 py-2 bg-gray-900/40">
+                <div className="detail-bracket-note text-xs text-gray-400 border border-gray-800/80 rounded-lg px-3 py-2 bg-gray-900/40">
                     <span className="font-semibold text-purple-300">Modo moderador.</span>{' '}
                     <span className="font-mono">− +</span> ajustan el marcador ({rules.unit.toLowerCase()}
                     {rules.winScore ? `; gana solo al llegar a ${rules.winScore}` : '; en este juego el ganador se declara a mano'}
@@ -254,19 +259,19 @@ export default function TournamentBracket({
             )}
 
             {error && (
-                <div className="text-xs text-red-400 border border-red-800/50 bg-red-950/30 rounded-lg px-3 py-2">
+                <div role="alert" className="text-xs text-red-400 border border-red-800/50 bg-red-950/30 rounded-lg px-3 py-2">
                     {error}
                 </div>
             )}
 
-            <div className="flex gap-6 overflow-x-auto pb-2">
+            <div className="detail-bracket-scroll flex gap-6 overflow-x-auto pb-2" role="region" aria-label="Rondas del torneo" tabIndex={0}>
                 {byRound.map((roundMatches, index) => {
                     const round = index + 1;
                     const emptyLabel = round === 1 ? 'BYE' : 'Por definir';
 
                     return (
                         <div key={round} className="flex flex-col shrink-0">
-                            <h4 className="text-xs uppercase tracking-wider text-purple-400 font-semibold mb-3 text-center">
+                            <h4 className="detail-round-title text-xs uppercase tracking-wider text-purple-400 font-semibold mb-3 text-center">
                                 {roundName(round, totalRounds)}
                             </h4>
 
@@ -295,7 +300,7 @@ export default function TournamentBracket({
                                     return (
                                         <div
                                             key={match.id}
-                                            className={`${manage ? 'w-80' : 'w-56'} bg-gray-900/60 border border-gray-800/80 rounded-lg overflow-hidden`}
+                                            className={`detail-match ${manage ? 'w-80' : 'w-56'} bg-gray-900/60 border border-gray-800/80 rounded-lg overflow-hidden`}
                                         >
                                             <PlayerRow
                                                 player={match.playerA}

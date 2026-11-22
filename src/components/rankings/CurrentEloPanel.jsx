@@ -21,12 +21,12 @@ function GameElo({ kind, entityId, game }) {
   </div>;
 }
 
-export default function CurrentEloPanel({ kind = 'players', entityId, games = [] }) {
+export default function CurrentEloPanel({ kind = 'players', entityId, games = [], prototype = false }) {
   const selectId = useId();
   const [chosen, setChosen] = useState('');
   const available = GAMES.filter(game => games.some(value => (typeof value === 'string' ? value : value?.gameName)?.trim().toLowerCase() === game.toLowerCase()));
   const game = available.includes(chosen) ? chosen : available[0];
-  return <section aria-label="Clasificación Elo" className="space-y-5 rounded-xl border border-gray-800 bg-[#161b22] p-6 text-white">
+  return <section aria-label="Clasificación Elo" className={prototype ? 'arena-profile-panel arena-profile-elo space-y-5' : 'space-y-5 rounded-xl border border-gray-800 bg-[#161b22] p-6 text-white'}>
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><h2 className="text-xl font-bold">Clasificación Elo {kind === 'teams' ? 'del equipo' : 'por juego'}</h2><p className="mt-1 text-sm text-gray-400">Rating competitivo. Los puntos de recompensa se consultan en Recompensas.</p></div>
       {available.length > 0 && <div><label htmlFor={selectId} className="mr-2 text-sm text-gray-400">Videojuego</label><select id={selectId} value={game} onChange={event => setChosen(event.target.value)} className="rounded-lg border border-gray-700 bg-[#0d1117] p-2 text-sm">{available.map(value => <option key={value}>{value}</option>)}</select></div>}

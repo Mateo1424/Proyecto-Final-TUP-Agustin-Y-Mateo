@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from '../../routing/navigation';
-import InvitationList from '../../components/team/InvitationList';
+import TeamInvitationsInbox from '../../components/teams/TeamInvitationsInbox';
 import { teamRequest } from '../../utils/teamInvitations';
+import './team-invitations.css';
 
 export default function TeamInvitationsPage() {
   const [invitations, setInvitations] = useState([]);
@@ -42,15 +42,5 @@ export default function TeamInvitationsPage() {
     }
   }
 
-  return <div className="p-6 text-white max-w-5xl mx-auto space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-3xl font-extrabold">Mis invitaciones a equipos</h1>
-      <button disabled={loading || Boolean(busy)} onClick={() => { setError(''); load(); }} className="px-4 py-2 rounded bg-purple-600 disabled:opacity-50">{loading ? 'Cargando...' : 'Actualizar'}</button>
-    </div>
-    <p className="text-gray-400">Las invitaciones vencen a los siete días. Para aceptar, necesitás el videojuego y rango en tu perfil y no pertenecer a otro equipo.</p>
-    {error && <p role="alert" className="text-red-400">{error}</p>}
-    {success && <p role="status" className="text-emerald-400">{success} {acceptedTeam && <Link to={`/teams/${acceptedTeam}`} className="underline">Ver equipo</Link>}</p>}
-    {loading ? <p role="status">Cargando invitaciones...</p> : <InvitationList invitations={invitations} busy={busy} onAction={act} />}
-    <Link to="/teams" className="inline-block text-purple-300 hover:underline">← Volver a equipos</Link>
-  </div>;
+  return <TeamInvitationsInbox invitations={invitations} loading={loading} busy={busy} error={error} success={success} acceptedTeam={acceptedTeam} load={() => { setError(''); load(); }} onAction={act} />;
 }

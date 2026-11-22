@@ -1,0 +1,50 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Router } from 'wouter';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('own profile separates avatar and staff stats, preserves game payloads and shows honest states', async () => {
+  const cacheDir = await mkdtemp(join(tmpdir(), 'profile-redesign-'));
+  const server = await createServer({ cacheDir, configFile: false, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, hmr: false, ws: false }, appType: 'custom' });
+  const previousFetch = globalThis.fetch;
+  try {
+    const api = await server.ssrLoadModule('/src/api/profile.js');
+    const calls = [];
+    globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return new Response(JSON.stringify({ avatarUrl: '', games: [], stats: {} })); };
+    await api.saveProfileAvatar('');
+    assert.equal(calls.length, 1); assert.ok(calls[0].url.endsWith('/profile/avatar'));
+    assert.deepEqual(JSON.parse(calls[0].body), { AvatarUrl: '' }); assert.equal(calls[0].credentials, 'include');
+    await api.saveProfileStats({ wins: '4', losses: '2', draws: '1' });
+    assert.deepEqual(JSON.parse(calls[1].body), { wins: 4, losses: 2, draws: 1 });
+    const game = { gameName: 'Rocket League', inGameName: 'Player#1234', rank: 'Oro' };
+    await api.saveProfileGame(game, false); await api.saveProfileGame(game, true); await api.deleteProfileGame('League of Legends');
+    assert.equal(calls[2].method, 'POST'); assert.equal(calls[3].method, 'PUT');
+    assert.deepEqual(JSON.parse(calls[2].body), game); assert.deepEqual(JSON.parse(calls[3].body), game);
+    assert.ok(calls[4].url.endsWith('/profile/games/League%20of%20Legends')); assert.equal(calls[4].method, 'DELETE');
+    globalThis.fetch = async () => new Response(JSON.stringify({ message: 'No permitido' }), { status: 403 });
+    await assert.rejects(api.saveProfileStats({ wins: 0, losses: 0, draws: 0 }), error => error.status === 403 && error.message === 'No permitido');
+    const { ProfileIdentity, ProfileTeams, ProfileEditors, ProfileGames } = await server.ssrLoadModule('/src/components/profile/OwnProfileSections.jsx');
+    const render = (Component, props) => renderToStaticMarkup(createElement(Router, { ssrPath: '/profile' }, createElement(Component, props)));
+    const profile = { id: 'me', username: 'Mi usuario', role: 'User', games: [], stats: { wins: 4, losses: 2, draws: 1, matchesPlayed: 7, winrate: 57 } };
+    const identity = render(ProfileIdentity, { profile }); assert.match(identity, /Mi usuario/); assert.match(identity, /7/); assert.doesNotMatch(identity, /<img/);
+    const regular = render(ProfileEditors, { profile, editing: 'stats', busy: '', onAvatar() {}, onStats() {} });
+    assert.doesNotMatch(regular, /Guardar estadísticas|Ganadas/);
+    const staff = render(ProfileEditors, { profile: { ...profile, role: 'Moderator' }, editing: 'stats', busy: '', onStats() {} });
+    assert.match(staff, /Guardar estadísticas/); assert.match(staff, /for="profile-wins"/);
+    const avatar = render(ProfileEditors, { profile, editing: 'avatar', busy: '', onAvatar() {} });
+    assert.match(avatar, /for="profile-avatar"/); assert.match(avatar, /Guardar avatar/); assert.doesNotMatch(avatar, /Guardar estadísticas/);
+    assert.match(render(ProfileGames, { games: [] }), /No tenés videojuegos vinculados/);
+    const teamError = render(ProfileTeams, { profile, resource: { error: 'Error de equipos', refresh() {} } });
+    assert.match(teamError, /Error de equipos/); assert.doesNotMatch(teamError, /No estás en/);
+    const team = render(ProfileTeams, { profile, resource: { data: [{ id: 'team', name: 'Equipo real', tag: 'REAL', members: [{ userId: 'me' }] }], loading: false } });
+    assert.match(team, /href="\/teams\/team"/); assert.match(team, /Equipo real/);
+    const { default: Elo } = await server.ssrLoadModule('/src/components/rankings/CurrentEloPanel.jsx');
+    assert.match(render(Elo, { entityId: 'me', games: [], prototype: true }), /arena-profile-elo/);
+    assert.doesNotMatch(render(Elo, { entityId: 'me', games: [] }), /arena-profile-elo/);
+  } finally { globalThis.fetch = previousFetch; await server.close(); await rm(cacheDir, { recursive: true, force: true }); }
+});

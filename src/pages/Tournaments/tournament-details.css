@@ -1,0 +1,38 @@
+.arena-details-dialog{margin:auto;width:min(76rem,94vw);max-width:94vw;max-height:84dvh;padding:0;border:1px solid var(--arena-line);background:var(--arena-bg);color:var(--arena-text);overflow:auto;overscroll-behavior:contain;color-scheme:dark}
+.arena-details-dialog::backdrop{background:#020503c9}
+.detail-dialog-bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 28px;border-bottom:1px solid var(--arena-line);background:var(--arena-bg)}
+.detail-dialog-bar>span{font-size:12px;color:var(--arena-muted)}
+.arena-tournament-detail{padding:clamp(20px,3vw,40px);min-width:0;overflow-wrap:anywhere}
+.detail-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:28px;flex-wrap:wrap;margin-bottom:30px}
+.detail-heading>div{min-width:0;flex:1 1 380px}.detail-heading .arena-title{font-size:clamp(36px,5vw,64px);overflow-wrap:anywhere}
+.detail-status{font-size:13px;color:var(--arena-lime)}
+.detail-dates{font-size:12px;display:grid;gap:14px;margin:0}.detail-dates dt{color:var(--arena-muted);margin-bottom:4px}.detail-dates dd{margin:0}
+.detail-overview{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(0,1.2fr);gap:20px;margin-bottom:28px}
+.detail-panel{padding:24px;border:1px solid var(--arena-line);background:var(--arena-surface);min-width:0}
+.arena-tournament-detail h2{font-size:22px;font-weight:800;margin:0 0 16px}.arena-tournament-detail h3{font-size:17px;font-weight:800}
+.detail-muted{color:var(--arena-muted);font-size:13px;line-height:1.8;margin:14px 0 0}
+.detail-registration .arena-button{width:100%;margin-top:12px}.detail-entry{font-size:32px;font-weight:800;color:var(--arena-lime);margin:16px 0}.detail-entry>span{font-size:12px;font-weight:400;color:var(--arena-muted)}
+.detail-prizes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:20px 0;border-bottom:1px solid var(--arena-line);margin:0}.detail-prizes dt{font-size:11px;color:var(--arena-muted)}.detail-prizes dd{margin:8px 0 0;font-size:19px;color:var(--arena-lime);font-weight:800}
+.detail-closed{color:var(--arena-lime);font-size:13px;padding-top:16px;border-top:1px solid var(--arena-line);margin-top:20px}
+.detail-section{padding:28px 0;border-top:1px solid var(--arena-line);min-width:0}.detail-section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}.detail-section-heading h2{margin:0}
+.detail-information{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin:0 0 28px}.detail-rules{display:grid;gap:20px;align-content:start}
+.detail-count{color:var(--arena-lime);font-size:14px;font-weight:800}
+.detail-participant-list{list-style:none;margin:0;padding:0;max-height:420px;overflow-y:auto}.detail-participant-list li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--arena-line);font-size:13px}
+.detail-player{min-width:0;display:grid;gap:6px;text-decoration:none;color:var(--arena-text)}.detail-player:hover{color:var(--arena-lime)}.detail-player small{color:var(--arena-muted)}.detail-player.is-disqualified strong{text-decoration:line-through}
+.detail-player-status{display:grid;text-align:right;font-size:11px;color:var(--arena-muted)}
+.detail-danger-link{min-height:44px;color:var(--arena-coral);text-decoration:underline;cursor:pointer;background:none;border:0}.detail-danger-link:disabled{opacity:.5;cursor:not-allowed}
+.detail-moderation{padding:28px 0 0;border-top:1px solid var(--arena-line)}.detail-moderation-actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0 12px}
+.detail-danger{border-color:var(--arena-coral);color:var(--arena-coral)}.detail-delete{max-width:640px;padding:20px;border:1px solid var(--arena-coral);margin-top:16px}.detail-delete label{font-size:13px;display:block;margin-top:20px}.detail-delete h3{margin:0}
+.detail-input{display:block;min-height:48px;width:100%;min-width:0;background:var(--arena-bg);border:1px solid var(--arena-line);color:var(--arena-text);padding:12px;font:inherit}
+.detail-error{font-size:13px;color:var(--arena-coral);margin:16px 0;line-height:1.6}
+.detail-enrollments{display:grid;gap:16px}.detail-enrollments section{border-radius:0;border-color:var(--arena-line);background:var(--arena-surface)}.detail-enrollments button{min-height:44px;cursor:pointer}
+.arena-bracket-region{max-width:100%;min-width:0}.detail-bracket-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:16px;scrollbar-color:var(--arena-line) var(--arena-bg)}
+.arena-bracket-region .detail-match{background:var(--arena-surface);border:1px solid var(--arena-line);border-radius:0;overflow:hidden}
+.arena-bracket-region .detail-round-title{color:var(--arena-lime);font-size:13px;font-weight:700}
+.arena-bracket-region .detail-bracket-note{font-size:12px;line-height:1.7;color:var(--arena-muted);padding:16px;border:1px solid var(--arena-line);background:var(--arena-surface)}
+.arena-bracket-region .detail-champion{border-left:3px solid var(--arena-lime);padding:16px;background:var(--arena-surface);color:var(--arena-lime)}
+.arena-bracket-region .detail-match button,.arena-bracket-region .detail-match a{min-height:44px;cursor:pointer}.arena-bracket-region .detail-score-button{min-width:44px;height:44px;border-radius:0}
+.arena-bracket-region .detail-match:has(.detail-score-button){width:410px}
+.arena-bracket-region .detail-match input,.arena-bracket-region .detail-match select{min-height:44px}
+@media(max-width:760px){.detail-overview,.detail-information{grid-template-columns:1fr}.arena-details-dialog{max-height:88dvh}.detail-dialog-bar{padding:12px 20px}.detail-heading>div{flex-basis:100%}.detail-dates{grid-template-columns:1fr 1fr;gap:20px}.detail-panel{padding:20px}}
+@media(max-width:420px){.detail-prizes{grid-template-columns:1fr;gap:0}.detail-prizes>div{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px}.detail-prizes dd{margin:0}.detail-dialog-bar>span{max-width:90px}.detail-dialog-bar .arena-button{padding:10px}.detail-dates{grid-template-columns:1fr}.detail-participant-list li{flex-wrap:wrap}.detail-player-status{text-align:left}}

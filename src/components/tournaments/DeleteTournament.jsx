@@ -18,17 +18,17 @@ export default function DeleteTournament({ tournament, onDeleted, disabled = fal
       setBusy(false);
     }
   }
-  if (!open) return <button type="button" disabled={disabled} onClick={() => { setOpen(true); setName(''); }} className="rounded-lg border border-red-700 px-4 py-3 text-red-300 hover:bg-red-950/50 disabled:opacity-50">Eliminar torneo definitivamente</button>;
-  return <form onSubmit={remove} className="max-w-lg rounded-lg border border-red-800 bg-red-950/20 p-4 text-left">
-    <p className="font-bold text-red-300">Eliminar torneo definitivamente</p>
-    <p className="my-3 text-sm">Esta acción no se puede deshacer. Los torneos con inscripciones deben cancelarse para conservar su historial y devolver los puntos.</p>
+  if (!open) return <button type="button" disabled={disabled} onClick={() => { setOpen(true); setName(''); }} className="arena-button detail-danger">Eliminar torneo definitivamente</button>;
+  return <form onSubmit={remove} className="detail-delete">
+    <h3>Eliminar torneo definitivamente</h3>
+    <p className="detail-muted">Esta acción no se puede deshacer. Los torneos con inscripciones deben cancelarse para conservar su historial y devolver los puntos.</p>
     <label className="block text-sm">Escribí exactamente el nombre: <strong className="break-words">{tournament.title}</strong>
-      <input autoComplete="off" value={name} onChange={event => setName(event.target.value)} disabled={busy} className="mt-2 block w-full rounded border border-gray-600 bg-[#0d1117] p-2 text-white" />
+      <input autoComplete="off" value={name} onChange={event => setName(event.target.value)} disabled={busy} className="detail-input mt-2" />
     </label>
-    {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
+    {error && <p role="alert" className="detail-error">{error}</p>}
     <div className="mt-4 flex flex-wrap gap-3">
-      <button type="submit" disabled={disabled || busy || name !== tournament.title} className="rounded bg-red-700 px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40">{busy ? 'Eliminando...' : 'Confirmar eliminación'}</button>
-      <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(''); }} className="rounded border border-gray-600 px-4 py-2">Volver</button>
+      <button type="submit" disabled={disabled || busy || name !== tournament.title} className="arena-button detail-danger">{busy ? 'Eliminando...' : 'Confirmar eliminación'}</button>
+      <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(''); }} className="arena-button">Volver</button>
     </div>
   </form>;
 }

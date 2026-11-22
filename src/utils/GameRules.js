@@ -3,6 +3,8 @@
 const GAME_RULES = {
   'Valorant': { unit: 'Rondas', winScore: 13 },
   'Counter-Strike 2': { unit: 'Rondas', winScore: 13 },
+  'CS:GO': { unit: 'Rondas', winScore: null },
+  'Rocket League': { unit: 'Goles', winScore: null },
   'EA FC 27': { unit: 'Goles', winScore: null },
   'League of Legends': { unit: 'Puntos', winScore: null },
 };

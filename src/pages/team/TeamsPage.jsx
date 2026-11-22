@@ -1,107 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Link } from '../../routing/navigation';
 import { apiFetch } from '../../config';
+import TeamsDirectory from '../../components/teams/TeamsDirectory.jsx';
+import './teams.css';
 
 export default function TeamsPage() {
-  const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const loadTeams = async () => {
-    setLoading(true);
-    setError('');
+  const [teams,setTeams]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const loadTeams=async () => {
+    setLoading(true); setError('');
     try {
-      const res = await apiFetch('/teams');
-      if (!res.ok) {
-        throw new Error(`No se pudieron cargar los equipos (error ${res.status}).`);
-      }
-      const data = await res.json();
+      const response=await apiFetch('/teams');
+      if(!response.ok) throw new Error(`No se pudieron cargar los equipos (error ${response.status}).`);
+      const data=await response.json();
       setTeams(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error al cargar equipos:', err);
-      setError(
-        err instanceof TypeError
-          ? 'No se pudo conectar con el servidor. ¿Está corriendo el backend?'
-          : err.message
-      );
-    } finally {
-      setLoading(false);
-    }
+    } catch(failure) {
+      console.error('Error al cargar equipos:',failure);
+      setError(failure instanceof TypeError ? 'No se pudo conectar con el servidor. Revisá tu conexión y reintentá.' : failure.message);
+    } finally {setLoading(false);}
   };
-
-  useEffect(() => {
-    Promise.resolve().then(loadTeams);
-  }, []);
-
-  if (loading) {
-    return <div className="p-6 text-white text-center">Cargando equipos...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 text-white max-w-xl mx-auto text-center space-y-4">
-        <div className="p-4 bg-red-950/50 border border-red-800 text-red-400 text-sm rounded-lg">
-          {error}
-        </div>
-        <button
-          onClick={loadTeams}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition cursor-pointer"
-        >
-          Reintentar
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 text-white max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-extrabold tracking-wide">Equipos Registrados</h2>
-        <Link
-          to="/teams/create"
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition shadow-lg shadow-purple-900/40"
-        >
-          + Crear Equipo
-        </Link>
-      </div>
-
-      <Link to="/team-invitations" className="inline-block mb-5 text-purple-300 hover:underline">Ver mis invitaciones a equipos →</Link>
-      {teams.length === 0 ? (
-        <div className="text-center py-12 bg-[#161b22] border border-gray-800 rounded-xl">
-          <p className="text-gray-400 mb-4">No hay equipos creados todavía.</p>
-          <Link to="/teams/create" className="text-purple-400 hover:underline font-semibold">
-            ¡Crea el primero ahora!
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {teams.map((team) => (
-            <Link to={`/teams/${team.id}`} key={team.id} className="block group">
-              <div className="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between p-5 shadow-md group-hover:border-purple-500 transition">
-                <div className="flex items-center space-x-4 mb-4">
-                  <img
-                    src={team.logoUrl}
-                    alt={team.name}
-                    className="w-14 h-14 object-cover rounded-full border border-purple-500/50 bg-gray-900"
-                  />
-                  <div>
-                    <span className="text-xs text-gray-300">{team.isPrivate ? 'Privado · Por invitación' : 'Público'}</span>
-                    <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition">{team.name}</h3>
-                    <span className="text-xs bg-purple-950 text-purple-400 px-2 py-0.5 rounded font-mono border border-purple-800">
-                      [{team.tag}]
-                    </span>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-800 pt-3 flex justify-between items-center text-xs text-gray-400">
-                  <span>Miembros: <strong className="text-white">{team.members?.length || 0}</strong></span>
-                  <span className="text-purple-400 font-medium group-hover:underline">Ver detalles →</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  useEffect(() => {Promise.resolve().then(loadTeams);},[]);
+  return <TeamsDirectory teams={teams} loading={loading} error={error} loadTeams={loadTeams} />;
 }

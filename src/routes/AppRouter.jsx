@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Router, Switch, Route, Redirect } from 'wouter';
 import '../theme.css';
-import LedBackground from '../components/layout/LedBackground';
 import LoadingScreen from '../components/layout/LoadingScreen';
 import { isModerator } from '../utils/Roles';
 import { useSessionStore } from '../store/session';
@@ -31,7 +30,7 @@ function Private({ children, staff = false }) {
   return <SessionRoute authenticated><AuthorizedContent staff={staff}>{children}</AuthorizedContent></SessionRoute>;
 }
 export default function AppRouter() {
-  return <Router><LedBackground /><Suspense fallback={<LoadingScreen />}><Switch>
+  return <Router><Suspense fallback={<LoadingScreen />}><Switch>
     <Route path="/login"><SessionRoute authenticated={false}><LoginPage /></SessionRoute></Route>
     <Route path="/register"><SessionRoute authenticated={false}><RegisterPage /></SessionRoute></Route>
     <Route path="/dashboard"><Private><DashboardPage /></Private></Route>

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { getCatalog, redeemReward } from '../../api/rewards.js';
 import { useWalletStore } from '../../store/wallet.js';
 import { getStoredUser } from '../../utils/Roles.js';
-import { points, money } from '../../utils/format.js';
+import { points } from '../../utils/format.js';
 import { beginAttempt, finishAttempt, loadAttempt, isDefiniteRejection } from '../../utils/redemptionAttempt.js';
 import { redemptionErrorMessage } from '../../utils/redemptionErrors.js';
 import useRewardsData from '../../hooks/useRewardsData.js';
 import { DataState, HistoryList, Receipt } from '../../components/rewards/RewardLists.jsx';
 import RewardConfirmation from '../../components/rewards/RewardConfirmation.jsx';
+import RewardCatalog from '../../components/rewards/RewardCatalog.jsx';
 import './rewards.css';
 
 const loadCatalog = (_page, signal) => getCatalog(signal);
@@ -75,9 +76,9 @@ export default function RewardsPage() {
     setError('');
   }
 
-  return <div className="rewards-page min-h-full px-5 py-8 md:px-10">
-    <header className="mb-8 flex flex-wrap items-end justify-between gap-6">
-      <div><p className="reward-eyebrow">NEXUS ARENA</p><h1 id="rewards-title" tabIndex={-1} className="reward-title">Recompensas</h1><p className="reward-muted mt-3">Usá tus puntos y consultá tus canjes.</p></div>
+  return <div className="rewards-page">
+    <header className="arena-page-heading">
+      <div><p className="reward-eyebrow">Puntos de recompensa</p><h1 id="rewards-title" tabIndex={-1} className="reward-title">Recompensas</h1><p className="reward-muted mt-3">Usá tus puntos y consultá tus canjes.</p></div>
       <div className="reward-balance"><p className="reward-muted text-sm">Tu saldo</p><p className="text-3xl font-bold">{balance === null ? walletLoading ? 'Cargando…' : 'Sin consultar' : points(balance)}</p><button type="button" className="reward-text-button mt-2" onClick={refresh} disabled={walletLoading}>Actualizar saldo</button>{walletError && <p role="alert" className="mt-2 max-w-sm text-sm">{walletError}</p>}</div>
     </header>
     <p className="reward-notice mb-6">Canjes de prueba: todos los códigos son ficticios y no funcionan en las plataformas. Catálogo US / USD; revisá la compatibilidad de cada producto.</p>
@@ -86,12 +87,7 @@ export default function RewardsPage() {
     {receipt && <section className="mb-6" aria-label="Último canje confirmado"><p role="status" className="mb-3 font-bold">Canje confirmado. El comprobante también está en Mis canjes.</p><Receipt receipt={receipt} /></section>}
     <nav aria-label="Secciones de recompensas" className="reward-tabs mb-7 flex flex-wrap gap-2">{sections.map(([id, label]) => <button type="button" key={id} className="reward-tab" aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>{label}</button>)}</nav>
     {tab === 'catalog' ? <section aria-label="Catálogo"><DataState {...catalog} empty={!catalog.data?.items?.length}>
-      <div className="grid gap-4 lg:grid-cols-2">{catalog.data?.items?.map(product => <article className="reward-panel flex flex-col items-start gap-3" key={product.id}>
-        <p className="reward-eyebrow">{product.platform}</p><h2 className="text-xl font-bold">{product.product}</h2><p>{money(product.faceValue, product.currency)} · {product.region}</p><p className="reward-muted text-sm">{product.compatibility}</p><p className="text-2xl font-bold">{points(product.costPoints)}</p>
-        {!product.available && <p>{product.unavailableReason || 'Producto no disponible.'}</p>}
-        {product.sourceUrl && <a className="reward-text-button text-sm" href={product.sourceUrl} target="_blank" rel="noreferrer">Información del producto</a>}
-        <button type="button" className="reward-button reward-primary mt-auto" disabled={!product.available || balance === null || balance < product.costPoints || !!pending || !!storageError || busy} onClick={() => { setSelected(product); setError(''); }}>{!product.available ? 'No disponible' : balance !== null && balance < product.costPoints ? 'Puntos insuficientes' : 'Canjear puntos'}</button>
-      </article>)}</div>
+      <RewardCatalog items={catalog.data?.items} balance={balance} pending={pending} storageError={storageError} busy={busy} onSelect={product => { setSelected(product); setError(''); }} />
     </DataState></section> : <HistoryList key={`${tab}:${historyRevision}`} kind={tab} />}
     {selected && <RewardConfirmation product={selected} balance={balance} pending={pending} busy={busy} error={error} onConfirm={confirm} onClose={() => setSelected(null)} />}
   </div>;
